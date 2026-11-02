@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Round 2 Panel Prep</title>
+<link rel="stylesheet" href="assets/notes.css">
+<style>
+details{border-top:1px solid var(--line);padding:.5em 0}
+summary{cursor:pointer;font-weight:600;list-style:none;padding:.2em 0}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸";color:var(--accent);display:inline-block;width:1.1em;transition:transform .15s}
+details[open] summary::before{transform:rotate(90deg)}
+details > :not(summary){margin-left:1.1em}
+pre{background:var(--card);padding:.6em .9em;border-radius:6px;overflow-x:auto;font-size:.88rem}
+pre code{font-family:Consolas,"Courier New",monospace}
+.ctl{font:13px system-ui,sans-serif;margin:.6em 0}
+.ctl button{font:inherit;padding:.3em .8em;margin-right:.4em;border:1px solid var(--line);background:var(--card);border-radius:4px;cursor:pointer}
+@media print{details > *{display:block}}
+</style>
+</head>
+<body>
+<main>
+<header class="unit">
+  <div class="kicker">Python &amp; AI Engineering Internship · Second technical round (panel)</div>
+  <h1>Round 2 Panel Prep</h1>
+  <p class="src">A panel is 2–4 interviewers asking in turn. Expect <b>deeper follow-ups</b> on Round 1 topics (OOP, RAG, JWT), <b>"how would you design..."</b> scenarios, live coding while you explain, and questions that test how you think under pressure. All code here has been run and checked. Basics are in the <a href="round1.html">Round 1 sheet</a>; project specifics are in the <a href="resume.html">resume line-by-line sheet</a>.</p>
+  <div class="ctl"><a href="index.html">← All sheets</a> · <button onclick="toggleAll(true)">Expand all</button><button onclick="toggleAll(false)">Collapse all</button></div>
+</header>
+
+<nav class="toc"><b>Sections</b>
+<ol>
+  <li><a href="#s1">How to handle a panel</a></li>
+  <li><a href="#s2">OOP, deeper</a></li>
+  <li><a href="#s3">RAG &amp; vector DB, deeper</a></li>
+  <li><a href="#s4">LLMs &amp; AI agents</a></li>
+  <li><a href="#s5">JWT &amp; backend, deeper</a></li>
+  <li><a href="#s6">Design scenarios</a></li>
+  <li><a href="#s7">Live coding: Python</a></li>
+  <li><a href="#s8">Predict the output</a></li>
+  <li><a href="#s9">SQL, deeper</a></li>
+  <li><a href="#s10">ML &amp; your projects, deeper</a></li>
+  <li><a href="#s11">Panel behavioral</a></li>
+  <li><a href="#s12">Questions to ask the panel</a></li>
+</ol></nav>
+
+<!-- ============================================ -->
+<h2 id="s1">1. How to Handle a Panel</h2>
+
+<details><summary>What is different about a panel round?</summary>
+<ul>
+<li>Several interviewers, each with their own focus: one on coding and DSA, one on AI/ML, one senior person checking fit and communication.</li>
+<li>Questions build on each other ("you said X, so what about Y?"). Your Round 1 answers may come back up.</li>
+<li>They test <b>depth and honesty</b>: how far your understanding goes before it runs out, and what you do when it does.</li>
+</ul>
+</details>
+
+<details><summary>How should I answer?</summary>
+<ul>
+<li><b>Make eye contact with the whole panel</b>, not only the person who asked.</li>
+<li><b>Think aloud.</b> In coding and design questions the reasoning matters more than the final answer. Start with a brute-force solution, then optimize.</li>
+<li><b>Clarify first</b>: "Can the input be empty? Are duplicates allowed? How large is the data?"</li>
+<li><b>Structure answers</b>: definition, then how it works, then an example from your own project, then the trade-offs.</li>
+<li><b>When you don't know</b>: "I haven't worked with that directly. My understanding is X, and I would verify it by doing Y." Never bluff, because panels probe a bluff right away.</li>
+<li><b>Accept hints gracefully.</b> Taking a hint and running with it scores well.</li>
+</ul>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s2">2. OOP, Deeper</h2>
+
+<details><summary>Composition vs inheritance: which do you prefer?</summary>
+<p><b>Inheritance</b> is an "is-a" relationship (<code>Savings</code> is an <code>Account</code>). <b>Composition</b> is a "has-a" relationship (a <code>Car</code> has an <code>Engine</code>). Prefer composition in most cases: it is flexible, components can be swapped at runtime, and it avoids deep and fragile class hierarchies.</p>
+<pre><code>class Engine:
+    def start(self): return "vroom"
+
+class Car:
+    def __init__(self, engine):
+        self.engine = engine          # has-a: inject any engine
+    def start(self): return self.engine.start()</code></pre>
+<p>In your Healthcare Assistant, the orchestrator <i>has</i> a SQL agent and a RAG agent (composition). It doesn't inherit from them.</p>
+</details>
+
+<details><summary>What are the SOLID principles?</summary>
+<ul>
+<li><b>S</b>ingle Responsibility: a class has one reason to change.</li>
+<li><b>O</b>pen/Closed: open for extension, closed for modification. Add a new subclass rather than editing an if-chain.</li>
+<li><b>L</b>iskov Substitution: a subclass must work anywhere its parent is expected.</li>
+<li><b>I</b>nterface Segregation: prefer many small interfaces to one fat interface.</li>
+<li><b>D</b>ependency Inversion: depend on abstractions, not concrete classes. Inject dependencies (FastAPI <code>Depends</code> is this idea in practice).</li>
+</ul>
+</details>
+
+<details><summary>Abstract class vs interface? Does Python have interfaces?</summary>
+<p>In Java, an abstract class can hold state and concrete methods, and a class extends only one. An interface is a pure contract, and a class can implement many. Python has no <code>interface</code> keyword. An <code>ABC</code> with only abstract methods acts as an interface, multiple inheritance is allowed, and <code>typing.Protocol</code> gives structural ("duck") typing.</p>
+</details>
+
+<details><summary>What is operator overloading? Show an example.</summary>
+<pre><code>class Vector:
+    def __init__(self, x, y): self.x, self.y = x, y
+    def __add__(self, o): return Vector(self.x + o.x, self.y + o.y)
+    def __eq__(self, o): return (self.x, self.y) == (o.x, o.y)
+    def __repr__(self): return f"Vector({self.x}, {self.y})"
+
+Vector(1, 2) + Vector(3, 4)   # Vector(4, 6)</code></pre>
+<p>Dunder methods let your objects work with built-in operators and functions: <code>__len__</code>, <code>__getitem__</code>, <code>__iter__</code>, <code>__lt__</code> (for sorting).</p>
+</details>
+
+<details><summary>What does <code>super()</code> do?</summary>
+<p>It calls the next class in the <b>MRO</b>, not simply "the parent". In multiple inheritance this makes cooperative <code>__init__</code> chains work, with each class initialized exactly once.</p>
+<pre><code>class Savings(Account):
+    def __init__(self, owner, balance, rate):
+        super().__init__(owner, balance)   # reuse parent init
+        self.rate = rate</code></pre>
+</details>
+
+<details><summary>What is the difference between a class variable and an instance variable?</summary>
+<p>A class variable is shared by all instances (<code>Account.bank_name</code>). An instance variable is per object (<code>self.owner</code>). A trap: a mutable class variable such as <code>items = []</code> is shared, so every instance appends to the same list.</p>
+</details>
+
+<details><summary>What is a design pattern? Name some you have used.</summary>
+<ul>
+<li><b>Singleton</b>: one instance, such as a DB connection or a loaded model. In Python a module-level object is enough.</li>
+<li><b>Factory</b>: create objects without specifying the exact class.</li>
+<li><b>Strategy</b>: interchangeable algorithms behind one interface, like your router choosing the SQL agent or the RAG agent.</li>
+<li><b>Decorator</b>: wrap behaviour (Python <code>@</code> decorators).</li>
+<li><b>Dependency Injection</b>: FastAPI <code>Depends</code>.</li>
+</ul>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s3">3. RAG &amp; Vector DB, Deeper</h2>
+
+<details><summary>How are embeddings created? What makes two sentences "close"?</summary>
+<p>A transformer encoder (such as all-MiniLM-L6-v2) reads the text, and its token outputs are <b>mean-pooled</b> into one fixed vector (384 dimensions here). The model is trained with <b>contrastive learning</b>: similar sentence pairs are pulled together and unrelated ones pushed apart. Meaning becomes geometry, so closeness is measured with cosine similarity.</p>
+</details>
+
+<details><summary>What chunking strategies exist? How do you pick one?</summary>
+<ul>
+<li><b>Fixed-size with overlap</b>: simple and the default choice.</li>
+<li><b>Recursive</b>: split on paragraphs, then sentences, then words, keeping natural boundaries (LangChain's default).</li>
+<li><b>Semantic</b>: split where the embedding similarity between sentences drops.</li>
+<li><b>Structure-aware</b>: split by headings, sections, or table rows. Best for policy documents and markdown.</li>
+</ul>
+<p>Pick by testing: build a small set of questions and measure retrieval recall at different chunk sizes. Small chunks give precise matches but lose context. Large chunks keep context but add noise.</p>
+</details>
+
+<details><summary>What is hybrid search? What is reranking?</summary>
+<p><b>Hybrid search</b> combines <b>keyword search</b> (BM25: exact terms, IDs, drug names) with <b>vector search</b> (meaning, synonyms), then merges the scores, for example with reciprocal rank fusion. Vectors alone miss exact matches like "ICD-10 code J45".</p>
+<p><b>Reranking</b>: retrieve the top 20–50 candidates quickly, then reorder them with a <b>cross-encoder</b> that reads the query and the chunk together. It is slower but far more accurate, and the top 3–5 go to the LLM.</p>
+</details>
+
+<details><summary>Bi-encoder vs cross-encoder</summary>
+<p>A <b>bi-encoder</b> embeds the query and documents <i>separately</i>, so document vectors can be precomputed and search is fast. It is used for retrieval. A <b>cross-encoder</b> processes the query and document <i>together</i> in one pass. It is more accurate but cannot precompute anything, so it is only practical for reranking a few candidates.</p>
+</details>
+
+<details><summary>Your RAG gives wrong answers. How do you debug it?</summary>
+<p>First find out which half is failing: <b>retrieval or generation</b>.</p>
+<ol>
+<li>Log the retrieved chunks. Is the right chunk in the top-k?</li>
+<li>If it isn't, the problem is <b>retrieval</b>. Try different chunk sizes, a better embedding model, hybrid search, reranking, query rewriting, or metadata filters. Check that the PDF parsed correctly, because tables and scanned pages often break.</li>
+<li>If the right chunk is there but the answer is still wrong, the problem is <b>generation</b>. Tighten the prompt ("only from context, otherwise say you don't know"), lower the temperature, put the best chunk first, or use a stronger model.</li>
+<li>Build an eval set so you can measure each fix, not guess.</li>
+</ol>
+</details>
+
+<details><summary>How does RAG handle a follow-up question like "what about for children?"</summary>
+<p>The follow-up has no meaning on its own. Use <b>query rewriting</b>: send the chat history and the new question to the LLM, ask for a standalone query ("What is the ICU visitor policy for children?"), then retrieve with that. Keep the last N turns or a running summary as memory.</p>
+</details>
+
+<details><summary>How do you keep the vector DB in sync when documents change?</summary>
+<p>Store a document id and a content hash as metadata. When a file changes, delete its old chunks by id and re-embed only that file. A scheduled job or a file watcher triggers the re-indexing. Never re-embed the whole corpus for one edit.</p>
+</details>
+
+<details><summary>Explain advanced RAG variants you know.</summary>
+<ul>
+<li><b>Multi-query</b>: the LLM generates several phrasings of the question, and the results are merged.</li>
+<li><b>HyDE</b>: the LLM writes a hypothetical answer, and that answer's embedding is used for search.</li>
+<li><b>Parent-document</b>: small chunks are used for matching, and the larger parent section goes to the LLM.</li>
+<li><b>Agentic RAG</b>: an agent decides whether to retrieve, which source to use, and whether to search again.</li>
+<li><b>GraphRAG</b>: a knowledge graph of entities and relations supports multi-hop questions.</li>
+</ul>
+</details>
+
+<details><summary>Implement the core retrieval step without a library.</summary>
+<pre><code>import numpy as np
+
+def chunk_text(text, size=500, overlap=50):
+    step = size - overlap
+    return [text[i:i + size] for i in range(0, len(text), step)]
+
+def top_k_chunks(query_vec, chunk_vecs, k=3):
+    q = query_vec / np.linalg.norm(query_vec)
+    m = chunk_vecs / np.linalg.norm(chunk_vecs, axis=1, keepdims=True)
+    scores = m @ q                       # cosine similarity for all chunks
+    idx = np.argsort(scores)[::-1][:k]   # highest first
+    return idx, scores[idx]</code></pre>
+<p>Then build the prompt: <code>f"Answer only from the context.\nContext:\n{joined_chunks}\nQuestion: {q}"</code>. Showing that you can write this without LangChain impresses panels.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s4">4. LLMs &amp; AI Agents</h2>
+
+<details><summary>How does an LLM generate text?</summary>
+<p>It works <b>autoregressively</b>:</p>
+<ol>
+<li>Tokenize the prompt.</li>
+<li>Pass the tokens through the transformer layers (self-attention plus feed-forward).</li>
+<li>Produce a probability distribution over the vocabulary for the next token.</li>
+<li>Sample one token (using temperature and top-p), append it, and repeat until a stop token.</li>
+</ol>
+<p>The <b>KV cache</b> stores past attention keys and values so each step doesn't recompute the whole sequence.</p>
+</details>
+
+<details><summary>Agent vs workflow (chain): what is the difference?</summary>
+<p>In a <b>workflow</b> the code fixes the order of steps (retrieve, then generate). It is predictable, cheap, and easy to test. In an <b>agent</b>, the LLM decides the next step and which tool to call, looping until it is done. It is flexible but less predictable, costlier, and harder to debug. Rule of thumb: use the simplest thing that works, and reach for an agent only when the steps can't be known in advance. Your healthcare app is closer to a <b>router workflow</b>, so say that honestly.</p>
+</details>
+
+<details><summary>How does tool calling (function calling) work?</summary>
+<ol>
+<li>You describe each tool to the model with a name, a description, and a JSON schema of its parameters.</li>
+<li>The model returns a structured call such as <code>{"name": "run_sql", "args": {"query": "..."}}</code>; it does not run anything itself.</li>
+<li><b>Your code</b> validates and executes the tool, then sends the result back.</li>
+<li>The model continues, either answering or calling another tool.</li>
+</ol>
+<pre><code>tools = {"run_sql": run_sql, "search_docs": search_docs}
+while True:
+    reply = llm(messages, tool_specs)
+    if not reply.tool_call:
+        return reply.text
+    result = tools[reply.tool_call.name](**reply.tool_call.args)
+    messages.append({"role": "tool", "content": str(result)})</code></pre>
+</details>
+
+<details><summary>What is LangGraph? What is MCP?</summary>
+<p><b>LangGraph</b> builds agents as a <b>state graph</b>: nodes are steps, edges are transitions (including loops and conditions), and a shared state persists between them. It gives more control than a LangChain agent and supports human-in-the-loop. <b>MCP (Model Context Protocol)</b> is an open standard for connecting LLM apps to tools and data sources. A tool written once as an MCP server works with any MCP client, like USB for AI tools.</p>
+</details>
+
+<details><summary>How do you make an agent safe and reliable?</summary>
+<ul>
+<li>Least privilege: read-only tools, an allowlist of tools, sandboxed execution.</li>
+<li>Validate tool arguments with a schema (Pydantic).</li>
+<li>Cap the number of steps and tokens to prevent infinite loops and runaway cost.</li>
+<li>Require human approval for irreversible actions (sending email, writing to the DB).</li>
+<li>Log every step (tracing with LangSmith or similar) and keep an eval set.</li>
+<li>Defend against prompt injection from tool outputs and documents.</li>
+</ul>
+</details>
+
+<details><summary>How do you evaluate an LLM application?</summary>
+<ul>
+<li>A <b>golden dataset</b> of 50–200 realistic questions with expected answers or sources.</li>
+<li>Metrics: retrieval recall, faithfulness, answer correctness, latency, and cost per query.</li>
+<li>Automated <b>LLM-as-judge</b> scoring, plus human review of a sample.</li>
+<li>Run the eval on every prompt or model change as a regression test.</li>
+</ul>
+</details>
+
+<details><summary>Fine-tuning vs prompt engineering vs RAG. What are LoRA and quantization?</summary>
+<p>Try them in order of cost: prompt engineering first, then RAG for knowledge, then fine-tuning for behaviour, format, or narrow tasks. <b>LoRA</b> freezes the base model and trains small low-rank adapter matrices, so it is cheap and needs little GPU. <b>Quantization</b> stores weights in 8- or 4-bit precision instead of 16 or 32. Ollama does this, which is why Llama 3.2 runs on your laptop, at a small quality cost.</p>
+</details>
+
+<details><summary>Open-source local model vs API model: how do you choose?</summary>
+<p><b>Local</b> (Llama via Ollama): privacy, no per-token cost, works offline, full control. The costs are hardware, weaker quality, and running it yourself. <b>API</b> (GPT, Claude, Gemini): the best quality and no infrastructure. The costs are data leaving your network, per-token pricing, rate limits, and vendor dependency. For healthcare data you chose local for privacy, which is a good, defensible trade-off.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s5">5. JWT &amp; Backend, Deeper</h2>
+
+<details><summary>JWT vs session cookies</summary>
+<table>
+<tr><th></th><th>Session</th><th>JWT</th></tr>
+<tr><td>State</td><td>Server stores sessions (DB or Redis)</td><td>Stateless; data lives in the token</td></tr>
+<tr><td>Revocation</td><td>Easy: delete the session</td><td>Hard until expiry</td></tr>
+<tr><td>Scaling</td><td>Needs a shared session store</td><td>Any server can verify</td></tr>
+<tr><td>Best for</td><td>Classic server-rendered web apps</td><td>APIs, SPAs, mobile, microservices</td></tr>
+</table>
+</details>
+
+<details><summary>Access token vs refresh token. How do you log a user out?</summary>
+<p>The <b>access token</b> is short-lived (5–15 minutes) and sent on every request. The <b>refresh token</b> is long-lived (days), kept in an httpOnly cookie, and used only to get a new access token. To log out: delete the refresh token server-side or add it to a denylist. The access token expires soon after. Rotating the refresh token on each use limits the damage if it is stolen.</p>
+</details>
+
+<details><summary>HS256 vs RS256</summary>
+<p><b>HS256</b> uses one shared secret both to sign and to verify, so every verifier holds a secret that could forge tokens. <b>RS256</b> signs with a private key and verifies with a public key. Other services can verify tokens without being able to forge them, which is better for microservices and third parties.</p>
+</details>
+
+<details><summary>Someone steals a JWT. What happens, and how do you prevent it?</summary>
+<p>The thief can act as that user until the token expires. To prevent it:</p>
+<ul><li>Use HTTPS only.</li><li>Keep access tokens short-lived.</li><li>Store tokens in httpOnly, Secure, SameSite cookies, which blocks XSS theft.</li><li>Rotate refresh tokens.</li><li>Optionally bind the token to a device or IP.</li><li>Never log tokens.</li></ul>
+<p>Also validate <code>exp</code>, and always fix the expected algorithm (reject <code>alg: none</code>).</p>
+</details>
+
+<details><summary>Authentication vs authorization</summary>
+<p><b>Authentication</b> answers "who are you?" (login, JWT verification), and its failure is <b>401</b>. <b>Authorization</b> answers "what are you allowed to do?" (role checks such as admin-only routes), and its failure is <b>403</b>.</p>
+</details>
+
+<details><summary>REST basics: methods, status codes, idempotency</summary>
+<p>The methods are GET (read), POST (create), PUT (replace), PATCH (partial update), and DELETE. <b>Idempotent</b> means repeating the call gives the same result: GET, PUT, and DELETE are idempotent, POST is not. Status codes: 200 OK, 201 Created, 204 No Content, 400 Bad Request, 401, 403, 404, 422 (FastAPI validation error), 500.</p>
+</details>
+
+<details><summary>Why FastAPI? What do async and Pydantic do?</summary>
+<p>FastAPI gives automatic validation through <b>Pydantic</b> models (type hints become request parsing plus 422 errors), auto-generated Swagger docs at <code>/docs</code>, dependency injection, and <b>async</b> support. Async lets one worker handle many concurrent I/O-bound requests, such as LLM API calls or DB queries, because it doesn't block while waiting.</p>
+<pre><code>class Query(BaseModel):
+    question: str
+    top_k: int = 3
+
+@app.post("/ask")
+async def ask(q: Query, user=Depends(get_current_user)):
+    chunks = retrieve(q.question, q.top_k)
+    return {"answer": await generate(q.question, chunks)}</code></pre>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s6">6. Design Scenarios</h2>
+<p class="src">Approach every design question the same way: clarify the requirements, describe the components, follow the data flow, then cover trade-offs and scaling. Say your assumptions aloud.</p>
+
+<details><summary>Design a chatbot that answers employees' questions from 10,000 company documents.</summary>
+<p><b>Clarify</b>: How many users? Do the documents change? Are there access restrictions (HR vs everyone)? Are citations needed? Which languages?</p>
+<p><b>Ingestion pipeline</b> (offline):</p>
+<ol><li>Load documents (PDF, DOCX, Confluence) and parse them.</li><li>Chunk them with structure awareness.</li><li>Embed the chunks.</li><li>Store them in a vector DB with metadata (source, department, access group, updated date).</li><li>A scheduled job re-indexes changed documents by hash.</li></ol>
+<p><b>Query path</b> (online):</p>
+<ol><li>The user logs in (JWT).</li><li>Rewrite the query using chat history.</li><li>Run hybrid search <b>filtered by the user's access groups</b>.</li><li>Rerank the results.</li><li>The LLM answers with citations.</li><li>Stream the response.</li></ol>
+<p><b>Extras</b>: cache frequent questions, log queries plus feedback (thumbs up/down), run an eval set, and set rate limits.</p>
+<p><b>Trade-offs</b>: local vs API LLM (privacy vs quality), chunk size, latency vs reranking cost.</p>
+</details>
+
+<details><summary>How would you scale your Healthcare Assistant from 1 user to 1,000?</summary>
+<ul>
+<li>Replace Streamlit with a <b>FastAPI backend</b> and a separate frontend, and use async endpoints.</li>
+<li>Serve the LLM with a GPU inference server such as vLLM or TGI, which batches requests. Ollama on a laptop can't keep up.</li>
+<li>Move ChromaDB to a client-server deployment, or use pgvector or Qdrant.</li>
+<li>Move SQLite to <b>PostgreSQL</b>, which handles concurrent writes.</li>
+<li>Add a cache (Redis) for repeat questions, and a queue for long jobs such as PDF ingestion.</li>
+<li>Containerize with Docker and scale horizontally behind a load balancer.</li>
+<li>Add auth, audit logs (healthcare compliance), and monitoring of latency and errors.</li>
+</ul>
+</details>
+
+<details><summary>Design an API that takes a PDF and answers questions about it.</summary>
+<ul>
+<li><code>POST /documents</code>: upload. Validate the type and size, store the file, and enqueue an ingestion job. Return a <code>doc_id</code> with status "processing".</li>
+<li>A background worker parses, chunks, and embeds the file, storing the chunks under that <code>doc_id</code>.</li>
+<li><code>GET /documents/{id}</code>: the processing status.</li>
+<li><code>POST /documents/{id}/ask</code>: retrieve, filtering by <code>doc_id</code>, then generate. Return the answer plus page citations.</li>
+<li>Handle edge cases: scanned PDFs need OCR, very large files, unsupported languages, and duplicate uploads (deduplicate by hash).</li>
+</ul>
+</details>
+
+<details><summary>The LLM's responses are too slow. How do you reduce latency?</summary>
+<ul><li><b>Stream</b> tokens so the user sees output immediately.</li><li>Use a smaller or quantized model where quality allows.</li><li>Send fewer input tokens: retrieve better and trim the context.</li><li>Cache answers and embeddings.</li><li>Run retrieval steps in parallel (asyncio).</li><li>Use prompt caching for a fixed system prompt.</li><li>Batch requests on GPU serving.</li></ul>
+</details>
+
+<details><summary>How would you prevent the Text-to-SQL agent from leaking another patient's data?</summary>
+<ul>
+<li>Use a read-only DB user with access only to permitted tables or views.</li>
+<li>Enforce <b>row-level security</b> in the database, or inject a mandatory <code>WHERE patient_id = :current_user</code> into the query. Never rely on the LLM to filter.</li>
+<li>Validate the generated SQL by parsing it: SELECT only, no multiple statements.</li>
+<li>Log every query for auditing.</li>
+<li>Rule to state: security belongs in the system layer, never in the prompt.</li>
+</ul>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s7">7. Live Coding: Python</h2>
+<p class="src">Panels usually give 1–2 medium problems. Say the brute-force approach, code the optimal one, then test it with an edge case aloud.</p>
+
+<details><summary>Group anagrams</summary>
+<pre><code>from collections import defaultdict
+def group_anagrams(words):
+    groups = defaultdict(list)
+    for w in words:
+        groups["".join(sorted(w))].append(w)
+    return list(groups.values())
+
+group_anagrams(["eat","tea","tan","ate","nat","bat"])
+# [['eat','tea','ate'], ['tan','nat'], ['bat']]</code></pre>
+<p>O(n · k log k), where k is the word length. You can use a 26-count tuple as the key for O(n · k).</p>
+</details>
+
+<details><summary>Top K frequent elements</summary>
+<pre><code>from collections import Counter
+def top_k_frequent(nums, k):
+    return [n for n, _ in Counter(nums).most_common(k)]</code></pre>
+<p><code>most_common(k)</code> uses a heap internally: O(n log k). Know the manual version, <code>heapq.nlargest(k, count, key=count.get)</code>, or bucket sort for O(n).</p>
+</details>
+
+<details><summary>LRU cache</summary>
+<pre><code>from collections import OrderedDict
+class LRUCache:
+    def __init__(self, capacity):
+        self.cap = capacity
+        self.data = OrderedDict()
+    def get(self, key):
+        if key not in self.data:
+            return -1
+        self.data.move_to_end(key)          # mark as recently used
+        return self.data[key]
+    def put(self, key, value):
+        self.data[key] = value
+        self.data.move_to_end(key)
+        if len(self.data) > self.cap:
+            self.data.popitem(last=False)   # evict least recently used</code></pre>
+<p>Both operations are O(1). Without OrderedDict you would use a hashmap plus a doubly linked list. In practice, <code>functools.lru_cache</code> does this for functions.</p>
+</details>
+
+<details><summary>Merge overlapping intervals</summary>
+<pre><code>def merge_intervals(intervals):
+    out = []
+    for s, e in sorted(intervals):
+        if out and s <= out[-1][1]:
+            out[-1][1] = max(out[-1][1], e)
+        else:
+            out.append([s, e])
+    return out
+
+merge_intervals([[1,3],[8,10],[2,6],[15,18]])   # [[1,6],[8,10],[15,18]]</code></pre>
+<p>O(n log n), because of the sort.</p>
+</details>
+
+<details><summary>Flatten a nested list</summary>
+<pre><code>def flatten(items):
+    for x in items:
+        if isinstance(x, list):
+            yield from flatten(x)
+        else:
+            yield x
+
+list(flatten([1, [2, [3, 4]], 5]))   # [1, 2, 3, 4, 5]</code></pre>
+</details>
+
+<details><summary>Second largest element in one pass</summary>
+<pre><code>def second_largest(nums):
+    first = second = float("-inf")
+    for n in nums:
+        if n > first:
+            first, second = n, first
+        elif first > n > second:
+            second = n
+    return second
+
+second_largest([3, 5, 5, 2])   # 3 (duplicates handled)</code></pre>
+</details>
+
+<details><summary>Valid palindrome, ignoring case and symbols</summary>
+<pre><code>def is_palindrome(s):
+    s = [c.lower() for c in s if c.isalnum()]
+    return s == s[::-1]
+
+is_palindrome("A man, a plan, a canal: Panama")   # True</code></pre>
+<p>Follow-up: do it in O(1) space with two pointers moving inward.</p>
+</details>
+
+<details><summary>Write a retry decorator with exponential backoff (useful for LLM APIs)</summary>
+<pre><code>import functools, time
+def retry(times=3, delay=1.0):
+    def deco(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            for attempt in range(1, times + 1):
+                try:
+                    return fn(*args, **kwargs)
+                except Exception:
+                    if attempt == times:
+                        raise
+                    time.sleep(delay * 2 ** (attempt - 1))   # 1s, 2s, 4s...
+        return wrapper
+    return deco
+
+@retry(times=3)
+def call_llm(prompt): ...</code></pre>
+<p>Mention that in real code you catch only the errors worth retrying (timeouts, 429, 5xx), not every exception.</p>
+</details>
+
+<details><summary>Cosine similarity with NumPy</summary>
+<pre><code>import numpy as np
+def cosine(a, b):
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    return a @ b / (np.linalg.norm(a) * np.linalg.norm(b))
+
+cosine([1, 0], [1, 1])   # 0.7071</code></pre>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s8">8. Predict the Output (Python Gotchas)</h2>
+
+<details><summary><code>fs = [lambda: i for i in range(3)]; print([f() for f in fs])</code></summary>
+<p><b>Output: <code>[2, 2, 2]</code></b>. Closures bind late: each lambda looks up <code>i</code> when it is called, and by then the loop has finished at 2. Fix it with <code>lambda i=i: i</code>.</p>
+</details>
+
+<details><summary><code>grid = [[0]*3]*3; grid[0][0] = 1; print(grid)</code></summary>
+<p><b>Output: <code>[[1, 0, 0], [1, 0, 0], [1, 0, 0]]</code></b>. The outer <code>*3</code> copies <b>references</b> to the same inner list. Fix it with <code>[[0]*3 for _ in range(3)]</code>.</p>
+</details>
+
+<details><summary><code>print(0.1 + 0.2 == 0.3)</code></summary>
+<p><b>Output: <code>False</code></b>. Binary floating point can't represent 0.1 exactly. Use <code>math.isclose(0.1 + 0.2, 0.3)</code>, or <code>Decimal</code> for money.</p>
+</details>
+
+<details><summary><code>a = 256; b = 256; print(a is b)</code>, and what about 257?</summary>
+<p>For 256 it prints <b><code>True</code></b>, because CPython caches the small integers −5 to 256. For 257 the result can be False, depending on context. Lesson: compare values with <code>==</code>, never with <code>is</code>.</p>
+</details>
+
+<details><summary><code>t = (1, [2]); t[1] += [3]</code>: what happens?</summary>
+<p>It raises a <b>TypeError</b>, <i>but</i> <code>t</code> becomes <code>(1, [2, 3])</code>. The list is extended in place first, and then the tuple item assignment fails. This is a classic trick question.</p>
+</details>
+
+<details><summary><code>def f(x=[]): x.append(1); return x</code>, called twice</summary>
+<p>It returns <b><code>[1]</code> then <code>[1, 1]</code></b>. The default list is created once, at definition time. Fix it with <code>x=None</code>.</p>
+</details>
+
+<details><summary><code>print([1, 2, 3][10:])</code> vs <code>[1, 2, 3][10]</code></summary>
+<p>The slice gives <b><code>[]</code></b>, because slicing never raises. Indexing raises an <b>IndexError</b>.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s9">9. SQL, Deeper</h2>
+
+<details><summary>Highest-paid employee in each department</summary>
+<pre><code>SELECT dept, name, salary FROM (
+  SELECT dept, name, salary,
+         RANK() OVER (PARTITION BY dept ORDER BY salary DESC) AS r
+  FROM employee
+) t WHERE r = 1;</code></pre>
+</details>
+
+<details><summary>ROW_NUMBER vs RANK vs DENSE_RANK</summary>
+<p>For the salaries 100, 100, 90: ROW_NUMBER gives 1, 2, 3. RANK gives 1, 1, 3, leaving a gap. DENSE_RANK gives 1, 1, 2, with no gap.</p>
+</details>
+
+<details><summary>Running total of sales by date</summary>
+<pre><code>SELECT sale_date, amount,
+       SUM(amount) OVER (ORDER BY sale_date) AS running_total
+FROM sales;</code></pre>
+</details>
+
+<details><summary>Find duplicate emails</summary>
+<pre><code>SELECT email, COUNT(*) FROM users
+GROUP BY email HAVING COUNT(*) > 1;</code></pre>
+</details>
+
+<details><summary>Students who have no result in any subject</summary>
+<pre><code>SELECT s.name FROM student s
+LEFT JOIN result r ON r.student_id = s.id
+WHERE r.id IS NULL;</code></pre>
+</details>
+
+<details><summary>What are transactions and isolation levels?</summary>
+<p>A transaction groups statements into one all-or-nothing unit (BEGIN, then COMMIT or ROLLBACK). The isolation levels, from weakest to strongest:</p>
+<ul><li><b>Read Uncommitted</b>: allows dirty reads.</li><li><b>Read Committed</b>: prevents dirty reads but allows non-repeatable reads.</li><li><b>Repeatable Read</b>: allows phantom reads.</li><li><b>Serializable</b>: the safest and slowest.</li></ul>
+</details>
+
+<details><summary>What is SQL injection, and how do you prevent it?</summary>
+<p>An attacker puts SQL into an input field: <code>' OR 1=1 --</code>. To prevent it, always use <b>parameterized queries</b> (<code>cursor.execute("SELECT * FROM u WHERE id = ?", (uid,))</code>) or an ORM. Never build SQL with f-strings. It matters doubly for LLM-generated SQL.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s10">10. ML &amp; Your Projects, Deeper</h2>
+
+<details><summary>What is data leakage? Give examples from your own work.</summary>
+<p>Leakage is information the model wouldn't have at prediction time getting into training, so scores look great but the model fails in production. In your work:</p>
+<ul><li>A random split on time-series data (Tesla) instead of a time-ordered split.</li><li>SMOTE or scaling applied before the split (Kaggle).</li><li>Tuning the threshold on the test set.</li></ul>
+<p>The fix is to split first and fit every transform on the training data only (a <code>Pipeline</code>).</p>
+</details>
+
+<details><summary>Why scale features? Which models need it?</summary>
+<p>Distance- and gradient-based models need it: KNN, K-Means, SVM, linear and logistic regression, and neural networks. Otherwise large-range features dominate. Tree models (XGBoost, Random Forest) don't need scaling, because splits are threshold-based. Use StandardScaler (z-score) or MinMaxScaler.</p>
+</details>
+
+<details><summary>How would you deploy one of your ML models?</summary>
+<ol>
+<li>Save the trained pipeline with <code>joblib</code>, or as SavedModel or ONNX for deep learning.</li>
+<li>Load it once at FastAPI startup.</li>
+<li>Expose <code>POST /predict</code> with a Pydantic input schema.</li>
+<li>Package it with Docker and deploy.</li>
+<li>Monitor latency, errors, and data drift, and retrain when the input distribution shifts.</li>
+</ol>
+</details>
+
+<details><summary>Lip reading: what would you change with more time or compute?</summary>
+<ul>
+<li>Data augmentation (horizontal flip, frame dropout, brightness).</li>
+<li>A pretrained visual frontend (ResNet-18 with 3D-conv), or a transformer or conformer instead of the BiLSTM.</li>
+<li>Beam search with a language model for CTC decoding.</li>
+<li>More speakers to improve generalization.</li>
+</ul>
+<p>Be specific about which error dominated: substitutions of similar-looking visemes such as p, b, and m.</p>
+</details>
+
+<details><summary>What does an epoch, a batch, and an iteration mean? What is early stopping?</summary>
+<p>An <b>epoch</b> is one full pass over the training data. A <b>batch</b> is the subset used for one gradient update, and an <b>iteration</b> is one such update. <b>Early stopping</b> halts training when the validation loss stops improving for N epochs, and restores the best weights. It is a regularizer.</p>
+</details>
+
+<details><summary>What is transfer learning?</summary>
+<p>Reuse a model pretrained on a large dataset (ImageNet, a large text corpus), then fine-tune its last layers on your small dataset. You get better accuracy with less data and compute. Sentence embeddings and LLMs are transfer learning too.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s11">11. Panel Behavioral</h2>
+
+<details><summary>Why should we select you?</summary>
+<p>Link three things to the JD:</p>
+<ol><li>Strong Python fundamentals plus DSA.</li><li>Hands-on GenAI work: you built a multi-agent RAG plus Text-to-SQL system, not just tutorials.</li><li>You learn fast: an 8-week CEI program covering classical ML through agentic AI.</li></ol>
+<p>Close with "I can contribute from week one on Python and AI tasks."</p>
+</details>
+
+<details><summary>What are your strengths and weaknesses?</summary>
+<p><b>Strength</b>: give one with proof, for example "I build things end to end, from data to model to UI, as in the Healthcare Assistant." <b>Weakness</b>: give a real one plus what you are doing about it, for example "I haven't worked on production-scale systems yet, so I'm learning Docker and deployment and plan to deploy my RAG app." Avoid "I'm a perfectionist."</p>
+</details>
+
+<details><summary>Tell us about a time you were stuck. How did you get unstuck?</summary>
+<p>Use STAR: the Situation (CTC loss gave NaN, or the LLM returned invalid SQL), the Task, the Action (isolated the issue, read the docs and issues, tested hypotheses one at a time), and the Result. End with what you learned.</p>
+</details>
+
+<details><summary>How do you learn a new technology quickly?</summary>
+<p>Read the official docs and quickstart, build a tiny working project right away, then go deeper where it breaks. Example: you learned LangChain and ChromaDB by building the Healthcare Assistant.</p>
+</details>
+
+<details><summary>How do you handle disagreement in a team?</summary>
+<p>Listen first and focus on data rather than opinions. Prototype or test both options when that is cheap, then commit to the team decision. Use an example from leading Himachalites.</p>
+</details>
+
+<details><summary>Where do you see yourself in 2–3 years?</summary>
+<p>As an AI engineer building production LLM systems, with a deep understanding of RAG, agents, and evaluation, and growing within the company. Show long-term interest, since they want PPO candidates.</p>
+</details>
+
+<details><summary>How do you use AI tools (ChatGPT, Copilot) in your work?</summary>
+<p>Be honest: you use them for boilerplate, debugging ideas, and learning, but you read and understand every line before using it, and you verify with tests. A panel may ask you to explain your own code line by line, so make sure you can.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s12">12. Questions to Ask the Panel</h2>
+
+<details><summary>Good questions to ask at the end</summary>
+<ul>
+<li>What kind of Python or AI projects would an intern work on in the first month?</li>
+<li>Which LLM stack does the team use: open-source models or APIs? LangChain, LangGraph, or custom code?</li>
+<li>How do you evaluate the quality of your AI features in production?</li>
+<li>What does success look like for an intern at the end of 3 months?</li>
+<li>What is the path from intern to full-time here?</li>
+</ul>
+<p>Avoid asking about stipend or leave in a technical round. Save those for HR.</p>
+</details>
+
+<footer>Before the panel: re-read your own project code, be able to draw each architecture on paper in 2 minutes, and practise the OOP and RAG answers from Round 1 aloud, since panels often repeat them with harder follow-ups.</footer>
+</main>
+<script>
+function toggleAll(open){document.querySelectorAll("details").forEach(d=>d.open=open)}
+window.addEventListener("beforeprint",()=>toggleAll(true));
+</script>
+</body>
+</html>

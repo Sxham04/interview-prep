@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Interview Prep Sheet</title>
+<link rel="stylesheet" href="assets/notes.css">
+<style>
+details{border-top:1px solid var(--line);padding:.5em 0}
+summary{cursor:pointer;font-weight:600;list-style:none;padding:.2em 0}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸";color:var(--accent);display:inline-block;width:1.1em;transition:transform .15s}
+details[open] summary::before{transform:rotate(90deg)}
+details > :not(summary){margin-left:1.1em}
+pre{background:var(--card);padding:.6em .9em;border-radius:6px;overflow-x:auto;font-size:.88rem}
+pre code{font-family:Consolas,"Courier New",monospace}
+.ctl{font:13px system-ui,sans-serif;margin:.6em 0}
+.ctl button{font:inherit;padding:.3em .8em;margin-right:.4em;border:1px solid var(--line);background:var(--card);border-radius:4px;cursor:pointer}
+@media print{details > *{display:block}}
+</style>
+</head>
+<body>
+<main>
+<header class="unit">
+  <div class="kicker">Python &amp; AI Engineering Internship · Technical interview</div>
+  <h1>Interview Q&amp;A Sheet</h1>
+  <p class="src">Questions mapped to the resume and the JD. Click a question to reveal the answer. Answers are short, so expand them in your own words. Next: <a href="round2.html">Round 2 panel prep</a> · <a href="resume.html">Resume line-by-line</a>.</p>
+  <div class="ctl"><a href="index.html">← All sheets</a> · <button onclick="toggleAll(true)">Expand all</button><button onclick="toggleAll(false)">Collapse all</button></div>
+</header>
+
+<nav class="toc"><b>Sections</b> · <a href="#s0"><b>Asked in Round 1 (real questions)</b></a>
+<ol>
+  <li><a href="#s1">Healthcare multi-agent assistant</a></li>
+  <li><a href="#s2">Lip reading pipeline</a></li>
+  <li><a href="#s3">Student result system</a></li>
+  <li><a href="#s4">CEI internship &amp; Kaggle</a></li>
+  <li><a href="#s5">Python</a></li>
+  <li><a href="#s6">OOP</a></li>
+  <li><a href="#s7">DSA (coding)</a></li>
+  <li><a href="#s8">DBMS / SQL</a></li>
+  <li><a href="#s9">ML fundamentals</a></li>
+  <li><a href="#s10">GenAI / LLM / RAG / Agents</a></li>
+  <li><a href="#s11">Behavioral / HR</a></li>
+  <li><a href="#s12">Weak spots</a></li>
+</ol></nav>
+
+<!-- ============================================ -->
+<h2 id="s0">Asked in Round 1</h2>
+<p class="src">These are the real questions from the first technical interview. Expect deeper follow-ups on the same topics in later rounds.</p>
+
+<details><summary>What is OOP? What are the 4 pillars?</summary>
+<p><b>Object-Oriented Programming</b> organizes code around <b>objects</b>: bundles of data (attributes) and the behaviour that acts on it (methods). A <b>class</b> is the blueprint, and an <b>object</b> is an instance of it. OOP models real-world entities, which makes code reusable, modular, and easier to maintain.</p>
+<ul>
+<li><b>Encapsulation</b>: keep data and the methods that change it together, and hide internal state. Outside code goes through methods, which can validate input. Example: a balance changes only through <code>deposit()</code>.</li>
+<li><b>Abstraction</b>: expose <i>what</i> an object does and hide <i>how</i> it does it. Example: you call <code>car.start()</code> without knowing the engine internals. In Python this is <code>abc.ABC</code> with <code>@abstractmethod</code>.</li>
+<li><b>Inheritance</b>: a child class reuses and extends a parent class, an "is-a" relationship (<code>Savings</code> is an <code>Account</code>). It avoids code duplication.</li>
+<li><b>Polymorphism</b>: "many forms". The same method call behaves differently depending on the object's class, through method overriding or duck typing. Example: <code>acc.monthly_interest()</code> on a Savings account vs a Current account.</li>
+</ul>
+<div class="tip">Encapsulation hides <i>data</i>; abstraction hides <i>complexity and implementation</i>. Interviewers often ask for that difference.</div>
+</details>
+
+<details><summary>Write code that shows all four pillars.</summary>
+<pre><code>from abc import ABC, abstractmethod
+
+class Account(ABC):                      # Abstraction: abstract base class
+    def __init__(self, owner, balance=0):
+        self.owner = owner
+        self.__balance = balance         # Encapsulation: private (name-mangled)
+
+    @property
+    def balance(self):                   # controlled read access
+        return self.__balance
+
+    def deposit(self, amount):
+        if amount &lt;= 0:
+            raise ValueError("amount must be positive")
+        self.__balance += amount
+
+    def _withdraw(self, amount):
+        if amount &gt; self.__balance:
+            raise ValueError("insufficient funds")
+        self.__balance -= amount
+
+    @abstractmethod
+    def monthly_interest(self): ...      # every subclass must implement
+
+class Savings(Account):                  # Inheritance
+    def monthly_interest(self):          # Polymorphism: overridden
+        return self.balance * 0.04 / 12
+
+class Current(Account):                  # Inheritance
+    def monthly_interest(self):          # Polymorphism: different behaviour
+        return 0
+
+    def withdraw(self, amount):
+        self._withdraw(amount)
+
+accounts = [Savings("Soham", 12000), Current("Ravi", 5000)]
+for acc in accounts:                     # same call, different behaviour
+    print(type(acc).__name__, acc.owner, acc.balance, acc.monthly_interest())
+
+accounts[1].withdraw(1000)
+print(accounts[1].balance)               # 4000
+# accounts[0].__balance  -&gt; AttributeError (hidden)
+# Account("x")           -&gt; TypeError (abstract class can't be instantiated)</code></pre>
+<p><b>Output:</b></p>
+<pre><code>Savings Soham 12000 40.0
+Current Ravi 5000 0
+4000</code></pre>
+<p>Talk through it: <code>__balance</code> cannot be set directly, so <code>deposit()</code> validates every change (encapsulation). <code>Account</code> defines the contract and cannot be instantiated (abstraction). <code>Savings</code> and <code>Current</code> reuse <code>deposit</code> and <code>balance</code> (inheritance). The loop calls one method and gets class-specific results (polymorphism).</p>
+</details>
+
+<details><summary>What is RAG? Why is it necessary?</summary>
+<p><b>Retrieval-Augmented Generation</b>: before the LLM answers, the system <b>retrieves</b> relevant chunks from an external knowledge base and adds them to the prompt. The model then generates an answer <b>grounded</b> in that context.</p>
+<p><b>Pipeline</b>:</p>
+<ol>
+<li><b>Ingest</b>: load documents, split them into chunks, embed each chunk, and store the vectors in a vector DB.</li>
+<li><b>Query</b>: embed the question and run a similarity search for the top-k chunks.</li>
+<li><b>Generate</b>: send a prompt of the form "answer using only this context" with the chunks and the question to the LLM. The answer can cite sources.</li>
+</ol>
+<p><b>Why it is necessary</b>:</p>
+<ul>
+<li><b>Knowledge cutoff</b>: the LLM doesn't know events after its training date.</li>
+<li><b>Private data</b>: it has never seen your company's documents, policies, or databases.</li>
+<li><b>Hallucination</b>: without facts in front of it, the model guesses confidently. Grounding reduces this.</li>
+<li><b>Citations and trust</b>: you can show which document an answer came from.</li>
+<li><b>Cheaper than fine-tuning</b>: to update knowledge you re-index documents, with no retraining. Fine-tuning teaches style and behaviour, not reliable facts.</li>
+</ul>
+</details>
+
+<details><summary>Models now have context windows long enough to hold all the domain information. Why still use a vector DB?</summary>
+<p>This is a strong follow-up question. Long context doesn't remove the need for retrieval:</p>
+<ul>
+<li><b>Cost</b>: you pay per input token on <i>every</i> query. Sending 1M tokens per question is far more expensive than sending about 3K retrieved tokens. Prompt caching helps but doesn't remove the cost.</li>
+<li><b>Latency</b>: processing a huge prompt takes seconds per request, while vector search takes milliseconds.</li>
+<li><b>Accuracy ("lost in the middle")</b>: models recall information at the start and end of a long context better than in the middle. Buried facts get missed, and irrelevant text distracts the model. A focused context often gives better answers.</li>
+<li><b>Scale</b>: enterprise data (millions of documents, gigabytes or terabytes) doesn't fit in any context window, even at 1–2M tokens.</li>
+<li><b>Freshness</b>: data changes daily. A vector DB updates one document incrementally, without rebuilding a giant prompt.</li>
+<li><b>Access control</b>: metadata filters retrieve only documents this user may see. Putting everything in context leaks data across users.</li>
+<li><b>Traceability</b>: you know exactly which chunks produced the answer, which is useful for citations and debugging.</li>
+</ul>
+<p><b>Balanced answer</b>: for a small, static document set, putting everything in context is fine and simpler. At real scale, cost, and freshness requirements, use retrieval, often as a hybrid: retrieve the top documents, then use long context to read them fully.</p>
+</details>
+
+<details><summary>Give a real-life use case of RAG.</summary>
+<p><b>Your own project</b> is the best answer: the <b>Healthcare Assistant</b>. Hospital staff ask "what is the visitor policy for the ICU?" The RAG agent retrieves the relevant sections of hospital policy PDFs from ChromaDB, and Llama 3.2 answers from them. It runs fully locally, so patient data stays private.</p>
+<p>Other examples:</p>
+<ul>
+<li><b>Customer support bots</b> that answer from product manuals, FAQs, and past tickets.</li>
+<li><b>Internal company knowledge assistants</b> over HR policies, Confluence, and Slack.</li>
+<li><b>Legal and compliance</b>: search contracts and regulations, with citations.</li>
+<li><b>Banking and insurance</b>: answer policy-term questions from the customer's own documents.</li>
+<li><b>Developer tools</b>: chat over a codebase or API documentation.</li>
+<li><b>E-commerce</b>: product Q&amp;A from specifications and reviews.</li>
+</ul>
+</details>
+
+<details><summary>What is JWT? Why do we use it?</summary>
+<p><b>JSON Web Token</b>: a compact, signed token used for <b>authentication and authorization</b>. Its format is <code>header.payload.signature</code>, with each part base64url-encoded.</p>
+<ul>
+<li><b>Header</b>: the algorithm and type, e.g. <code>{"alg":"HS256","typ":"JWT"}</code>.</li>
+<li><b>Payload</b> (claims): <code>{"sub":"42","role":"admin","exp":1730000000}</code>.</li>
+<li><b>Signature</b>: <code>HMAC-SHA256(header + "." + payload, SECRET)</code>. It proves the token wasn't tampered with.</li>
+</ul>
+<p><b>Flow</b>:</p>
+<ol>
+<li>The user logs in with credentials.</li>
+<li>The server verifies them and signs a JWT.</li>
+<li>The client stores the token and sends <code>Authorization: Bearer &lt;token&gt;</code> on each request.</li>
+<li>The server verifies the signature and expiry, then trusts the claims. It needs no database lookup.</li>
+</ol>
+<p><b>Why use it</b>:</p>
+<ul>
+<li><b>Stateless</b>: the server stores no session, so it scales horizontally. Any server holding the secret can verify the token.</li>
+<li><b>Self-contained</b>: user id and role are inside the token, so role checks are fast (admin vs student in your Result System).</li>
+<li><b>Works across services</b>: suits microservices, mobile apps, and SPAs, because it isn't tied to cookies on one domain.</li>
+<li><b>Tamper-proof</b>: any change to the payload breaks the signature.</li>
+</ul>
+<p><b>Caveats to mention</b>:</p>
+<ul>
+<li>The payload is <b>encoded, not encrypted</b>, so never put passwords in it.</li>
+<li>A JWT is hard to revoke before it expires, so use short-lived access tokens plus refresh tokens, or a denylist.</li>
+<li>Store it in an httpOnly cookie to protect against XSS.</li>
+<li>Always use HTTPS.</li>
+</ul>
+<p><b>Your project</b>: in the Student Result System, the login endpoint issues a JWT. A FastAPI <code>Depends(get_current_user)</code> decodes it on protected routes, and <code>require_admin</code> checks the <code>role</code> claim.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s1">1. Multi-Agent Healthcare Assistant</h2>
+
+<details><summary>Walk me through the architecture.</summary>
+<p>A user query goes to an <b>orchestrator</b> (Llama 3.2 via Ollama). The orchestrator classifies the intent and routes the query to one of two agents:</p>
+<ul>
+<li><b>NLP-to-SQL agent</b>: the prompt holds the SQLite schema. The LLM generates SQL, the agent runs it on patient records, and returns the rows.</li>
+<li><b>RAG agent</b>: it embeds the query (all-MiniLM-L6-v2), retrieves the top-k chunks from ChromaDB (hospital policy PDFs), and the LLM answers grounded in that context.</li>
+</ul>
+<p>The router returns a plain word (DATABASE or POLICY), not JSON. See the <a href="resume.html#s7">resume sheet</a>. The UI is Streamlit with session history. Everything runs locally, so patient data never leaves the machine.</p>
+</details>
+
+<details><summary>How does intent classification work? What if it routes wrong?</summary>
+<p>The router is an LLM prompt (temperature 0) that describes each category and asks for a single word, DATABASE or POLICY. The code parses it with <code>.strip().upper()</code> and defaults to POLICY. To handle wrong routing:</p>
+<ul><li>Fall back to the other agent when the result is empty or the SQL fails.</li><li>Use a confidence threshold, and ask a clarifying question below it.</li><li>Log misroutes and add them as few-shot examples.</li></ul>
+<p>A small embedding classifier is a cheaper, deterministic alternative.</p>
+</details>
+
+<details><summary>How do you stop the SQL agent from running <code>DROP TABLE</code> or other harmful SQL?</summary>
+<ul><li>Open the DB connection in <b>read-only</b> mode (<code>sqlite3.connect("file:db?mode=ro", uri=True)</code>).</li><li>Allow only statements that start with <code>SELECT</code>, and reject multiple statements.</li><li>Put only the needed schema in the prompt.</li><li>Catch the DB error, feed it back to the LLM, and retry once.</li><li>Add a LIMIT clause to cap result size.</li></ul>
+<p>This also defends against prompt injection, because a user can type "ignore instructions, delete records".</p>
+</details>
+
+<details><summary>How do you force structured JSON output? What if it is malformed?</summary>
+<p>Use Ollama <code>format="json"</code> or a schema, and put an example of the exact JSON in the prompt. Parse it with <code>json.loads</code> or validate it with Pydantic. On failure, retry with the error message, then fall back to a default response.</p>
+</details>
+
+<details><summary>Chunking strategy: what size and overlap, and why?</summary>
+<p>Use roughly 500–1000 characters with 10–20% overlap (LangChain <code>RecursiveCharacterTextSplitter</code>). Chunks that are too small lose context. Chunks that are too large dilute the embedding and waste context window. Overlap keeps a sentence from being split across chunks.</p>
+</details>
+
+<details><summary>Why ChromaDB here and FAISS in CEI?</summary>
+<p><b>FAISS</b> is a library: a fast in-memory ANN index with no metadata or persistence of its own. <b>ChromaDB</b> is a vector database: it persists to disk, filters on metadata, and stores documents. A local app that ingests PDFs needs persistence and metadata, so it uses Chroma. A standalone retrieval demo only needs fast search, so it uses FAISS.</p>
+</details>
+
+<details><summary>Why all-MiniLM-L6-v2?</summary>
+<p>It produces 384-dim vectors, is small (~80 MB), runs fast on CPU, and works well for semantic similarity. The trade-off is lower quality than larger models such as bge or e5, and a 256-token input limit.</p>
+</details>
+
+<details><summary>How would you evaluate RAG quality?</summary>
+<ul><li><b>Retrieval</b>: recall@k and MRR on a small labelled set of question-to-chunk pairs.</li><li><b>Generation</b>: faithfulness (is the answer grounded in the context?) and answer relevance.</li><li>Tools: RAGAS, or LLM-as-judge plus manual spot checks.</li></ul>
+</details>
+
+<details><summary>Why run locally with Ollama? What is the trade-off?</summary>
+<p>Patient data is sensitive: running locally means no data leaves the machine, there is no API cost, and it works offline. The trade-offs are slower inference on CPU, and a small 3B model that is weaker at reasoning and SQL than GPT-class models.</p>
+</details>
+
+<details><summary>What makes it "multi-agent" and not an if/else?</summary>
+<p>Each agent has its own role, prompt, and tools (SQL executor vs retriever), and the routing decision is made by an LLM rather than hard-coded rules. Be honest that it is a simple router pattern, not autonomous agents negotiating. Interviewers respect that.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s2">2. Lip Reading Pipeline</h2>
+
+<details><summary>Why 3D-CNN over 2D-CNN?</summary>
+<p>A 2D convolution sees one frame at a time. A 3D kernel (time × height × width) convolves across neighbouring frames, so it captures lip <b>motion</b> and not only shape.</p>
+</details>
+
+<details><summary>Why a Bidirectional LSTM?</summary>
+<p>Speech depends on context on both sides. A sound is easier to identify when you know what comes before and after it. A BiLSTM reads the sequence forward and backward and concatenates both hidden states.</p>
+</details>
+
+<details><summary>Explain CTC loss. Why use it here?</summary>
+<p>You have 75 frames but a much shorter transcript, with no per-frame labels. CTC adds a <b>blank</b> token and sums the probability over every alignment that collapses to the target text (merge repeats, then remove blanks). It needs no manual segmentation. Decoding uses greedy or beam search.</p>
+</details>
+
+<details><summary>What are WER and CER? Is 32% good?</summary>
+<p>WER = (substitutions + deletions + insertions) / number of reference words. CER is the same at character level. LipNet reported a few percent WER on GRID with heavy tuning, so 32% is a reasonable student result, not state of the art. Ways to improve it:</p>
+<ul><li>More training epochs and data augmentation (flips, frame jitter).</li><li>Beam search with a language model.</li><li>A pretrained visual frontend or a transformer.</li></ul>
+</details>
+
+<details><summary>Why grayscale and a 112×112 crop?</summary>
+<p>Colour adds little information for lip shape, and grayscale cuts the input to a third. A tight mouth ROI removes irrelevant face and background pixels, cuts compute, and helps the model focus. Normalizing (mean/std) stabilizes training.</p>
+</details>
+
+<details><summary>How did you locate the lips? Was this your own design?</summary>
+<p>Your code uses a <b>fixed crop</b>, <code>gray[190:302, 80:192]</code>, because GRID speakers sit in a fixed position. For real-world video you'd add landmarks (dlib points 48–67 or MediaPipe). If the design was inspired by LipNet, say so. Claiming an original architecture that you cannot defend is worse.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s3">3. Student Result Management System</h2>
+
+<details><summary>How does JWT work?</summary>
+<p>There are three base64url parts: <b>header.payload.signature</b>. On login the server signs the payload (user id, role, expiry) with a secret key. The client sends <code>Authorization: Bearer &lt;token&gt;</code>, and the server verifies the signature, so it needs no session store (stateless). The payload is <b>encoded, not encrypted</b>, so never put secrets in it. Storage options: an httpOnly cookie is safer against XSS, while localStorage is simpler.</p>
+</details>
+
+<details><summary>How did you enforce admin vs student roles?</summary>
+<pre><code>def get_current_user(token: str = Depends(oauth2_scheme)):
+    payload = jwt.decode(token, SECRET, algorithms=["HS256"])
+    return db_get_user(payload["sub"])
+
+def require_admin(user = Depends(get_current_user)):
+    if user.role != "admin":
+        raise HTTPException(403)
+    return user
+
+@app.post("/results")
+def add_result(..., user = Depends(require_admin)): ...</code></pre>
+<p>FastAPI resolves the <code>Depends</code> chain before the route runs, so the auth logic is written once and reused everywhere.</p>
+</details>
+
+<details><summary>Draw your schema.</summary>
+<p>Your code has: <b>users</b>(id PK, name, email UNIQUE, password, role), where students are users with role "student"; <b>subjects</b>(id PK, name UNIQUE); <b>results</b>(id PK, student_id FK users, subject_id FK subjects, marks). Students and subjects are <b>many-to-many</b>, linked through results. Improvement to mention: a <code>UNIQUE(student_id, subject_id)</code> constraint to block duplicate entries, which the code doesn't have yet.</p>
+</details>
+
+<details><summary>What does an ORM give you, and what is its downside?</summary>
+<p>Pros: Python objects in place of raw SQL, DB portability (SQLite to Postgres), parameterized queries that prevent SQL injection, and relationships. Cons: hidden inefficient queries (the <b>N+1 problem</b>), less control, and overhead on complex queries.</p>
+</details>
+
+<details><summary>How are passwords stored?</summary>
+<p>They are hashed with <b>bcrypt</b> (passlib), which is salted and deliberately slow. Never store plain text, and never use bare MD5 or SHA for passwords.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s4">4. CEI Internship &amp; Kaggle</h2>
+
+<details><summary>R² of 0.9983 is suspiciously high. Did you check for leakage?</summary>
+<p>This is the most likely trap. A good answer:</p>
+<ul><li>I used a <b>time-ordered split</b> (train on the past, test on the future), not a random split.</li><li>Lag features use only past values (<code>shift(1)</code>), so no current or future value leaks in.</li><li>Delivery data is highly autocorrelated, so lag-1 alone explains most of the variance. I compared against a naive baseline ("next = last value").</li></ul>
+<p>If you did not do these, admit it and explain how you would fix it.</p>
+</details>
+
+<details><summary>Why lag features?</summary>
+<p>Tree models such as XGBoost have no notion of time order. Lag and rolling features (t-1, t-2, rolling mean) turn a time series into a supervised table that the model can learn from.</p>
+</details>
+
+<details><summary>K-Means vs DBSCAN vs Hierarchical: when do you use each? How do you choose k?</summary>
+<table>
+<tr><th>Algorithm</th><th>Use when</th><th>Weakness</th></tr>
+<tr><td>K-Means</td><td>Spherical clusters and a known k; it is fast</td><td>Sensitive to scale and outliers; k must be set</td></tr>
+<tr><td>DBSCAN</td><td>Arbitrary shapes, noise or outlier detection</td><td>Sensitive to eps and min_samples; struggles with varying density</td></tr>
+<tr><td>Hierarchical</td><td>Small data where a dendrogram shows structure</td><td>O(n²) memory</td></tr>
+</table>
+<p>To choose k, use the elbow method (inertia) or the silhouette score. Scale features first.</p>
+</details>
+
+<details><summary>CIFAR-10 at 81.9%: how would you raise it?</summary>
+<p>Data augmentation (flip, crop), BatchNorm, dropout, a deeper network or ResNet blocks, LR scheduling, and transfer learning from ImageNet weights. Each can push accuracy above 90%.</p>
+</details>
+
+<details><summary>RNN vs LSTM vs GRU: what is the vanishing gradient problem?</summary>
+<p>A plain RNN multiplies gradients through time steps, so they shrink toward zero and it cannot learn long dependencies. An <b>LSTM</b> adds a cell state with input, forget, and output gates, so gradients flow additively. A <b>GRU</b> merges these into update and reset gates: fewer parameters, faster, and often similar accuracy.</p>
+</details>
+
+<details><summary>What is an autoencoder? What does a denoising autoencoder do?</summary>
+<p>An encoder compresses the input to a bottleneck and a decoder reconstructs it; training minimizes reconstruction loss. A <b>denoising</b> autoencoder takes noisy input and learns to output the clean original. This forces it to learn robust features rather than the identity function.</p>
+</details>
+
+<details><summary>Kaggle: why Macro F1 and not accuracy?</summary>
+<p>Anomalies are rare. A model that predicts "normal" every time gets high accuracy but is useless. Macro F1 averages F1 per class equally, so the minority class counts the same as the majority class.</p>
+</details>
+
+<details><summary>Did you apply SMOTE before or after the split?</summary>
+<p>It must be <b>after</b>, on the training fold only (use an <code>imblearn</code> Pipeline inside CV). If you oversample before the split, synthetic points derived from test samples leak into training and inflate the score.</p>
+</details>
+
+<details><summary>How did you tune the threshold?</summary>
+<p>The default threshold of 0.5 is not optimal for imbalanced data. I swept thresholds on the <b>validation</b> set's predicted probabilities and picked the one with the highest F1. Never tune on the test set.</p>
+</details>
+
+<details><summary>XGBoost vs LightGBM?</summary>
+<p>Both are gradient-boosted trees. XGBoost grows trees level-wise. LightGBM grows them <b>leaf-wise</b> with histogram binning, so it is faster on large data but can overfit small data (limit <code>num_leaves</code>). An ensemble of the two reduces variance.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s5">5. Python</h2>
+
+<details><summary>List vs tuple vs set vs dict</summary>
+<table>
+<tr><th>Type</th><th>Ordered</th><th>Mutable</th><th>Duplicates</th><th>Lookup</th></tr>
+<tr><td>list</td><td>yes</td><td>yes</td><td>yes</td><td>O(n)</td></tr>
+<tr><td>tuple</td><td>yes</td><td>no</td><td>yes</td><td>O(n)</td></tr>
+<tr><td>set</td><td>no</td><td>yes</td><td>no</td><td>O(1)</td></tr>
+<tr><td>dict</td><td>insertion order (3.7+)</td><td>yes</td><td>unique keys</td><td>O(1)</td></tr>
+</table>
+<p>A list cannot be a dict key because it is mutable and therefore unhashable. A tuple can be a key if all its items are hashable.</p>
+</details>
+
+<details><summary>Shallow vs deep copy</summary>
+<pre><code>import copy
+a = [[1, 2], [3]]
+b = copy.copy(a)      # new outer list, same inner lists
+c = copy.deepcopy(a)  # fully independent
+a[0].append(9)        # b sees it, c does not</code></pre>
+</details>
+
+<details><summary><code>is</code> vs <code>==</code></summary>
+<p><code>==</code> compares values (<code>__eq__</code>). <code>is</code> compares identity (same object in memory). Use <code>is</code> only for <code>None</code> and other singletons.</p>
+</details>
+
+<details><summary>What is the mutable default argument trap?</summary>
+<pre><code>def add(x, items=[]):    # list created ONCE, at definition time
+    items.append(x); return items
+add(1); add(2)           # [1, 2]  (surprise)
+
+def add(x, items=None):  # fix
+    if items is None: items = []
+    items.append(x); return items</code></pre>
+</details>
+
+<details><summary><code>*args</code> and <code>**kwargs</code></summary>
+<p><code>*args</code> collects extra positional arguments into a tuple. <code>**kwargs</code> collects extra keyword arguments into a dict. Both are used for wrappers and decorators that forward any arguments.</p>
+</details>
+
+<details><summary>Write a decorator (timer)</summary>
+<pre><code>import time, functools
+def timer(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        t = time.perf_counter()
+        result = fn(*args, **kwargs)
+        print(f"{fn.__name__}: {time.perf_counter() - t:.4f}s")
+        return result
+    return wrapper
+
+@timer
+def work(): sum(range(10**6))</code></pre>
+</details>
+
+<details><summary>Generators: what does <code>yield</code> do?</summary>
+<p>A function that uses <code>yield</code> returns an iterator that produces values lazily, one at a time, keeping its state between calls. It uses O(1) memory, compared with building a full list. Use it for large files and streams. A generator expression looks like <code>(x*x for x in data)</code>.</p>
+</details>
+
+<details><summary>What is the GIL? Threading vs multiprocessing vs asyncio</summary>
+<p>The Global Interpreter Lock lets only one thread run Python bytecode at a time.</p>
+<ul><li><b>threading</b>: suits I/O-bound work, because the GIL is released while waiting.</li><li><b>multiprocessing</b>: suits CPU-bound work. Separate processes give true parallelism.</li><li><b>asyncio</b>: one thread with cooperative multitasking, for many concurrent I/O tasks (FastAPI async routes).</li></ul>
+</details>
+
+<details><summary>try / except / else / finally</summary>
+<p><code>else</code> runs only if no exception was raised. <code>finally</code> always runs, so use it for cleanup. Catch specific exceptions, not a bare <code>except:</code>.</p>
+</details>
+
+<details><summary><code>__str__</code> vs <code>__repr__</code></summary>
+<p><code>__str__</code> is the readable form for users (<code>print</code>). <code>__repr__</code> is the unambiguous form for developers, ideally valid code that recreates the object. If only <code>__repr__</code> is defined, <code>str()</code> falls back to it.</p>
+</details>
+
+<details><summary>What does <code>with</code> do?</summary>
+<p>It is a context manager: it calls <code>__enter__</code> at the start and <code>__exit__</code> at the end, even on an exception. That guarantees cleanup such as closing a file or releasing a lock. <code>contextlib.contextmanager</code> builds one from a generator.</p>
+</details>
+
+<details><summary>How does Python manage memory?</summary>
+<p>Through <b>reference counting</b>: an object is freed when its count reaches 0. A cyclic <b>garbage collector</b> handles reference cycles. Small ints and some strings are cached (interned).</p>
+</details>
+
+<details><summary>Sort a list of dicts by a key</summary>
+<pre><code>students.sort(key=lambda s: s["marks"], reverse=True)
+top3 = sorted(students, key=lambda s: -s["marks"])[:3]</code></pre>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s6">6. OOP</h2>
+
+<details><summary>Explain the four pillars with Python examples.</summary>
+<ul>
+<li><b>Encapsulation</b>: bundle data and methods, and hide internals (<code>_balance</code>, properties).</li>
+<li><b>Abstraction</b>: expose what an object does, not how (an <code>abc.ABC</code> with <code>@abstractmethod</code>).</li>
+<li><b>Inheritance</b>: <code>class Admin(User)</code> reuses and extends the parent.</li>
+<li><b>Polymorphism</b>: one interface with many forms. <code>shape.area()</code> works for Circle and Square; duck typing.</li>
+</ul>
+</details>
+
+<details><summary>Overloading vs overriding in Python</summary>
+<p><b>Overriding</b>: a child class redefines a parent method, and can call <code>super()</code>. Python has no true <b>overloading</b>: a later definition replaces an earlier one. Use default arguments, <code>*args</code>, or <code>functools.singledispatch</code>. Operator overloading works through dunder methods (<code>__add__</code>).</p>
+</details>
+
+<details><summary><code>@staticmethod</code> vs <code>@classmethod</code></summary>
+<p>A classmethod receives <code>cls</code> and is used for alternative constructors (<code>Date.from_string()</code>). A staticmethod receives neither self nor cls: it is a utility function grouped under the class.</p>
+</details>
+
+<details><summary>Multiple inheritance and MRO (the diamond problem)</summary>
+<p>Python resolves methods with <b>C3 linearization</b>. Inspect the order with <code>Class.__mro__</code>. With <code>class D(B, C)</code> and both inheriting A, the order is D, B, C, A, so A is visited once. <code>super()</code> follows the MRO.</p>
+</details>
+
+<details><summary>Is encapsulation real in Python?</summary>
+<p>Only by convention. <code>_x</code> means "internal, please don't touch". <code>__x</code> triggers name mangling to <code>_Class__x</code> to avoid subclass clashes. Nothing is truly private. Use <code>@property</code> for controlled access.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s7">7. DSA (Live Coding)</h2>
+<p class="src">For every solution, state the time and space complexity. Talk while you code.</p>
+
+<details><summary>Two Sum</summary>
+<pre><code>def two_sum(nums, target):
+    seen = {}
+    for i, n in enumerate(nums):
+        if target - n in seen:
+            return [seen[target - n], i]
+        seen[n] = i</code></pre>
+<p>O(n) time, O(n) space. Brute force is O(n²).</p>
+</details>
+
+<details><summary>Valid parentheses</summary>
+<pre><code>def valid(s):
+    pairs = {")": "(", "]": "[", "}": "{"}
+    stack = []
+    for c in s:
+        if c in pairs:
+            if not stack or stack.pop() != pairs[c]:
+                return False
+        else:
+            stack.append(c)
+    return not stack</code></pre>
+<p>O(n) time, O(n) space.</p>
+</details>
+
+<details><summary>Reverse a linked list</summary>
+<pre><code>def reverse(head):
+    prev = None
+    while head:
+        head.next, prev, head = prev, head, head.next
+    return prev</code></pre>
+<p>O(n) time, O(1) space.</p>
+</details>
+
+<details><summary>First non-repeating character</summary>
+<pre><code>from collections import Counter
+def first_unique(s):
+    count = Counter(s)
+    return next((c for c in s if count[c] == 1), None)</code></pre>
+<p>O(n) time.</p>
+</details>
+
+<details><summary>Maximum subarray sum (Kadane's algorithm)</summary>
+<pre><code>def max_subarray(nums):
+    best = cur = nums[0]
+    for n in nums[1:]:
+        cur = max(n, cur + n)
+        best = max(best, cur)
+    return best</code></pre>
+<p>O(n) time, O(1) space.</p>
+</details>
+
+<details><summary>Longest substring without repeating characters (sliding window)</summary>
+<pre><code>def longest(s):
+    last, start, best = {}, 0, 0
+    for i, c in enumerate(s):
+        if last.get(c, -1) >= start:
+            start = last[c] + 1
+        last[c] = i
+        best = max(best, i - start + 1)
+    return best</code></pre>
+<p>O(n) time.</p>
+</details>
+
+<details><summary>Binary search</summary>
+<pre><code>def bsearch(a, x):
+    lo, hi = 0, len(a) - 1
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        if a[mid] == x: return mid
+        if a[mid] < x: lo = mid + 1
+        else: hi = mid - 1
+    return -1</code></pre>
+<p>O(log n) time. The array must be sorted. The stdlib has <code>bisect</code>.</p>
+</details>
+
+<details><summary>Anagram check</summary>
+<pre><code>from collections import Counter
+def is_anagram(a, b): return Counter(a) == Counter(b)</code></pre>
+<p>O(n) time. <code>sorted(a) == sorted(b)</code> is O(n log n).</p>
+</details>
+
+<details><summary>Fibonacci: recursive vs memoized</summary>
+<pre><code>from functools import lru_cache
+@lru_cache(maxsize=None)
+def fib(n): return n if n < 2 else fib(n-1) + fib(n-2)</code></pre>
+<p>Naive recursion is O(2ⁿ). Memoized it is O(n). Iterative with two variables is O(n) time and O(1) space.</p>
+</details>
+
+<details><summary>Height of a binary tree, and BFS level order</summary>
+<pre><code>def height(node):
+    return 0 if not node else 1 + max(height(node.left), height(node.right))
+
+from collections import deque
+def level_order(root):
+    q, out = deque([root] if root else []), []
+    while q:
+        node = q.popleft(); out.append(node.val)
+        if node.left: q.append(node.left)
+        if node.right: q.append(node.right)
+    return out</code></pre>
+</details>
+
+<details><summary>Merge two sorted arrays</summary>
+<pre><code>def merge(a, b):
+    i = j = 0; out = []
+    while i < len(a) and j < len(b):
+        if a[i] <= b[j]: out.append(a[i]); i += 1
+        else: out.append(b[j]); j += 1
+    return out + a[i:] + b[j:]</code></pre>
+<p>O(n + m) time.</p>
+</details>
+
+<details><summary>Common complexities to know</summary>
+<p>Sorting (Timsort): O(n log n). Dict and set lookup: O(1) average. List <code>in</code>: O(n). List append: O(1) amortized. <code>list.insert(0, x)</code>: O(n), so use <code>deque</code>. Heap push and pop: O(log n).</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s8">8. DBMS / SQL</h2>
+
+<details><summary>Find the Nth highest salary</summary>
+<pre><code>SELECT DISTINCT salary FROM employee
+ORDER BY salary DESC LIMIT 1 OFFSET N-1;
+
+-- or with a window function
+SELECT salary FROM (
+  SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS r FROM employee
+) t WHERE r = N;</code></pre>
+</details>
+
+<details><summary>Employees earning more than their manager</summary>
+<pre><code>SELECT e.name FROM employee e
+JOIN employee m ON e.manager_id = m.id
+WHERE e.salary > m.salary;</code></pre>
+</details>
+
+<details><summary>WHERE vs HAVING</summary>
+<p>WHERE filters rows <b>before</b> grouping. HAVING filters groups <b>after</b> GROUP BY and can use aggregates.</p>
+<pre><code>SELECT dept, AVG(salary) FROM employee
+WHERE active = 1 GROUP BY dept HAVING AVG(salary) > 50000;</code></pre>
+</details>
+
+<details><summary>Types of JOIN</summary>
+<p><b>INNER</b>: only matching rows. <b>LEFT</b>: all left rows, with NULL where the right has no match. <b>RIGHT</b>: the mirror of LEFT. <b>FULL OUTER</b>: all rows from both. <b>CROSS</b>: the Cartesian product. <b>SELF</b>: a table joined to itself.</p>
+</details>
+
+<details><summary>Normalization: 1NF, 2NF, 3NF</summary>
+<ul><li><b>1NF</b>: atomic values, no repeating groups.</li><li><b>2NF</b>: 1NF, and no partial dependency on part of a composite key.</li><li><b>3NF</b>: 2NF, and no transitive dependency (a non-key column depending on another non-key column).</li></ul>
+<p>The goal is to remove redundancy and update anomalies. You may denormalize for read speed.</p>
+</details>
+
+<details><summary>ACID properties</summary>
+<p><b>Atomicity</b>: all or nothing. <b>Consistency</b>: constraints always hold. <b>Isolation</b>: concurrent transactions don't interfere. <b>Durability</b>: committed data survives a crash.</p>
+</details>
+
+<details><summary>What is an index? When does it hurt?</summary>
+<p>An index is usually a B-tree on a column, and turns lookups from O(n) into O(log n). It hurts write-heavy tables, because every INSERT or UPDATE must also update the index. It adds storage, and does little on low-cardinality columns.</p>
+</details>
+
+<details><summary>Primary key vs unique key vs foreign key</summary>
+<p><b>PK</b>: unique and NOT NULL, one per table. <b>Unique</b>: no duplicates, NULL allowed, many per table. <b>FK</b>: references another table's PK and enforces referential integrity.</p>
+</details>
+
+<details><summary>DELETE vs TRUNCATE vs DROP</summary>
+<p><b>DELETE</b>: removes rows, can take a WHERE, is logged, can be rolled back. <b>TRUNCATE</b>: removes all rows quickly and keeps the structure. <b>DROP</b>: removes the table itself.</p>
+</details>
+
+<details><summary>SQL vs NoSQL. Where does a vector database fit?</summary>
+<p>SQL means a fixed schema, relations, ACID, and joins. NoSQL (document, key-value, graph) means a flexible schema and horizontal scaling. A <b>vector database</b> (Chroma, FAISS, pgvector) stores embeddings and answers similarity search rather than exact matches.</p>
+</details>
+
+<details><summary>Using your schema: average marks per subject, and the top 3 students</summary>
+<pre><code>SELECT s.name, AVG(r.marks) AS avg_marks
+FROM result r JOIN subject s ON r.subject_id = s.id
+GROUP BY s.name;
+
+SELECT st.name, AVG(r.marks) AS avg_marks
+FROM result r JOIN student st ON r.student_id = st.id
+GROUP BY st.id ORDER BY avg_marks DESC LIMIT 3;</code></pre>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s9">9. ML Fundamentals</h2>
+
+<details><summary>Supervised vs unsupervised vs reinforcement learning</summary>
+<p><b>Supervised</b>: labelled data (regression, classification). <b>Unsupervised</b>: no labels; find structure (clustering, PCA). <b>Reinforcement</b>: an agent learns from rewards by interacting with an environment.</p>
+</details>
+
+<details><summary>Bias-variance trade-off and overfitting</summary>
+<p>High bias means underfitting: the model is too simple. High variance means overfitting: it memorizes noise, scoring well on train and badly on test. Fixes for overfitting: more data, regularization (L1/L2), dropout, early stopping, a simpler model, and cross-validation.</p>
+</details>
+
+<details><summary>Precision, recall, F1, ROC-AUC</summary>
+<p><b>Precision</b> = TP / (TP + FP): of the predicted positives, how many are correct. Use it when false positives are costly, as in spam filtering. <b>Recall</b> = TP / (TP + FN): of the actual positives, how many were found. Use it when misses are costly, as in disease or anomaly detection. <b>F1</b> is their harmonic mean. <b>ROC-AUC</b> measures ranking quality across all thresholds. Prefer PR-AUC when classes are heavily imbalanced.</p>
+</details>
+
+<details><summary>Bagging vs boosting</summary>
+<p><b>Bagging</b> (Random Forest): trees are trained in parallel on bootstrap samples and averaged, which reduces variance. <b>Boosting</b> (XGBoost): trees are trained sequentially, each fixing the previous one's errors, which reduces bias. Boosting is often more accurate but easier to overfit.</p>
+</details>
+
+<details><summary>Train/val/test split and cross-validation</summary>
+<p>Train fits the model, validation tunes hyperparameters, and test is a final one-time estimate. K-fold CV rotates the validation fold. Use stratified K-fold for imbalanced data and TimeSeriesSplit for time series.</p>
+</details>
+
+<details><summary>Gradient descent and learning rate</summary>
+<p>Gradient descent updates weights against the gradient of the loss: <code>w = w - lr * dL/dw</code>. If the learning rate is too high, training diverges; too low, it is slow. Variants: SGD, mini-batch, and Adam (adaptive per-parameter rates).</p>
+</details>
+
+<details><summary>Why ReLU?</summary>
+<p>It is cheap and does not saturate for positive inputs, so it avoids the vanishing gradients of sigmoid and tanh. Its weakness is "dying ReLU" (neurons stuck at 0), which Leaky ReLU fixes. Use softmax at the output for multi-class and sigmoid for binary.</p>
+</details>
+
+<details><summary>How do you handle imbalanced data?</summary>
+<p>Use class weights, resampling (SMOTE or undersampling, on train only), threshold tuning, and the right metric (F1, PR-AUC).</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s10">10. GenAI / LLM / RAG / Agents</h2>
+
+<details><summary>What is an LLM? Explain attention briefly.</summary>
+<p>An LLM is a transformer trained to predict the next token on huge text corpora. <b>Self-attention</b> lets each token weigh every other token: <code>softmax(QKᵀ/√d)·V</code>. This captures context in parallel, unlike an RNN.</p>
+</details>
+
+<details><summary>Tokens and context window</summary>
+<p>A token is a sub-word unit, about 4 characters of English. The context window is the maximum number of tokens the model can see at once (prompt plus output). Anything beyond it is lost, which is one reason RAG retrieves only the relevant chunks.</p>
+</details>
+
+<details><summary>What are embeddings? What is cosine similarity?</summary>
+<p>An embedding is a dense vector in which semantically similar text lies close together. Cosine similarity = (A·B) / (|A||B|), the angle between vectors, ranging from -1 to 1. It is used to rank retrieved chunks.</p>
+</details>
+
+<details><summary>RAG vs fine-tuning</summary>
+<p><b>RAG</b> suits changing or private knowledge and needs citations. It requires no training and the data can be updated instantly. <b>Fine-tuning</b> changes behaviour, style, or format, or teaches a narrow task. It does not reliably add facts and is costly. They are often combined.</p>
+</details>
+
+<details><summary>How does vector search scale? (ANN)</summary>
+<p>Exact search compares against every vector, which is O(n). Approximate nearest neighbour indexes are much faster for a small accuracy loss:</p>
+<ul><li><b>HNSW</b>: a graph index (Chroma uses it).</li><li><b>IVF</b>: clusters the vectors and searches only the nearest clusters.</li><li><b>PQ</b>: compresses vectors (FAISS offers all of these).</li></ul>
+</details>
+
+<details><summary>Temperature and top-p</summary>
+<p>Temperature scales the logits: near 0 output is deterministic, which suits SQL and JSON; higher is more creative. Top-p (nucleus) samples only from the smallest set of tokens whose cumulative probability reaches p.</p>
+</details>
+
+<details><summary>Prompting techniques</summary>
+<p><b>Zero-shot</b>: instructions only. <b>Few-shot</b>: include examples. <b>Chain-of-thought</b>: ask for step-by-step reasoning. Also useful: system role prompts, output format constraints, and delimiters around the context.</p>
+</details>
+
+<details><summary>What is an AI agent? What is ReAct?</summary>
+<p>An agent is an LLM that decides which <b>tools</b> to call (search, SQL, API), observes the results, and loops until done. <b>ReAct</b> means Reason, then Act, then Observe, repeated. The parts are the LLM, the tools, memory, and a planner or loop.</p>
+</details>
+
+<details><summary>What does LangChain give you? Could you work without it?</summary>
+<p>It provides ready-made loaders, splitters, vector-store wrappers, prompt templates, chains, and agents, so you prototype quickly. Its downsides are heavy abstraction and API churn. Yes, you could build without it: a RAG pipeline is about 50 lines (embed, search, format prompt, call LLM). Saying this shows you understand what happens underneath.</p>
+</details>
+
+<details><summary>What is hallucination? How do you reduce it?</summary>
+<p>Hallucination is confident but false output. To reduce it: use RAG grounding, add "answer only from the context, otherwise say you don't know", lower the temperature, cite sources, and validate outputs.</p>
+</details>
+
+<details><summary>What is prompt injection?</summary>
+<p>Malicious instructions arrive in user input or in retrieved documents ("ignore previous instructions..."). Mitigations: least-privilege tools (a read-only DB), input and output validation, separating the system prompt from data, and human approval for risky actions.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s11">11. Behavioral / HR</h2>
+
+<details><summary>Walk me through your resume.</summary>
+<p>Keep it to about 90 seconds: who you are (DIT CSE 2027, CGPA 8.6), what you build (ML plus GenAI systems), and your two strongest items (the healthcare multi-agent assistant and the CEI internship). Then say why this role fits you.</p>
+</details>
+
+<details><summary>Which project are you proudest of?</summary>
+<p>The healthcare assistant fits this JD best: Python, LLMs, RAG, and agents. Use the STAR structure: the problem (private, offline querying), your decisions (routing, local model), the challenges (SQL correctness), and what you would improve.</p>
+</details>
+
+<details><summary>Hardest bug you hit?</summary>
+<p>Pick a real one, for example CTC loss returning NaN or inf, LLM JSON failing to parse, or a shape mismatch in the 3D-CNN. Describe how you debugged it: reproduce, isolate, form a hypothesis, fix, verify.</p>
+</details>
+
+<details><summary>Project Lead on Himachalites: what did you do?</summary>
+<p>Planning, splitting the work, design-to-deploy decisions, and code reviews. Be ready with one example of a conflict or deadline and how you handled it.</p>
+</details>
+
+<details><summary>Why AI engineering? Why this company?</summary>
+<p>Connect your projects to their stack (Python, GenAI, RAG, agents). Research the company first and mention one specific product or domain.</p>
+</details>
+
+<details><summary>OK with Dehradun, and later Noida?</summary>
+<p>Answer with a clear yes. Hesitation here costs offers.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s12">12. Weak Spots to Prepare</h2>
+
+<details><summary>Docker, PostgreSQL, and Java are listed but not used in any project.</summary>
+<p>Expect "where did you use Docker?" Have a concrete answer, for example "containerized the FastAPI app", or remove the item from the resume.</p>
+</details>
+
+<details><summary>Every metric and tool on the page is fair game.</summary>
+<p>R² 0.9983, 96–98%, 81.9%, 32.2% WER, F1 0.609 to 0.65: know how you computed each one, on which split, and against which baseline.</p>
+</details>
+
+<footer>Tip: practise answering aloud in under 60 seconds per question, then go one level deeper when asked "why?".</footer>
+</main>
+<script>
+function toggleAll(open){document.querySelectorAll("details").forEach(d=>d.open=open)}
+window.addEventListener("beforeprint",()=>toggleAll(true));
+</script>
+</body>
+</html>

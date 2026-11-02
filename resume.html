@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Resume Line Prep</title>
+<link rel="stylesheet" href="assets/notes.css">
+<style>
+details{border-top:1px solid var(--line);padding:.5em 0}
+summary{cursor:pointer;font-weight:600;list-style:none;padding:.2em 0}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸";color:var(--accent);display:inline-block;width:1.1em;transition:transform .15s}
+details[open] summary::before{transform:rotate(90deg)}
+details > :not(summary){margin-left:1.1em}
+pre{background:var(--card);padding:.6em .9em;border-radius:6px;overflow-x:auto;font-size:.88rem}
+pre code{font-family:Consolas,"Courier New",monospace}
+.ctl{font:13px system-ui,sans-serif;margin:.6em 0}
+.ctl button{font:inherit;padding:.3em .8em;margin-right:.4em;border:1px solid var(--line);background:var(--card);border-radius:4px;cursor:pointer}
+blockquote.line{margin:1.2em 0 .4em;padding:.5em .9em;border-left:4px solid var(--accent);background:var(--card);border-radius:0 6px 6px 0;font-style:italic}
+.facts{background:var(--key-soft);border:1px solid var(--line);padding:.5em .9em;margin:.5em 0;border-radius:6px;font-size:.93rem}
+.facts::before{content:"What your code actually does — ";font-weight:700;color:var(--key)}
+.flag{background:#fbe3e0;border:1px solid #e7b5ae;padding:.5em .9em;margin:.5em 0;border-radius:6px;font-size:.93rem}
+.flag::before{content:"Mismatch — ";font-weight:700;color:#9b2c1f}
+@media print{details > *{display:block}}
+</style>
+</head>
+<body>
+<main>
+<header class="unit">
+  <div class="kicker">Resume defence · every line, every number</div>
+  <h1>Resume Line-by-Line Prep</h1>
+  <p class="src">Each resume line is quoted, followed by what your GitHub code actually does, then the questions that line invites, with answers. The facts come from reading your repos (lip_reading, healthcare_rag, CEI-Assignments, Res-management, Himachalites) on 3 Nov 2026. Other sheets: <a href="round1.html">Round 1 Q&amp;A</a> · <a href="round2.html">Round 2 panel</a>.</p>
+  <div class="ctl"><a href="index.html">← All sheets</a> · <button onclick="toggleAll(true)">Expand all</button><button onclick="toggleAll(false)">Collapse all</button></div>
+</header>
+
+<nav class="toc"><b>Sections</b>
+<ol>
+  <li><a href="#s0">Fix before the interview</a></li>
+  <li><a href="#s1">Summary line</a></li>
+  <li><a href="#s2">Education &amp; coursework</a></li>
+  <li><a href="#s3">Technical skills</a></li>
+  <li><a href="#s4">CEI internship</a></li>
+  <li><a href="#s5">Himachalites</a></li>
+  <li><a href="#s6">Lip Reading Pipeline</a></li>
+  <li><a href="#s7">Healthcare Assistant</a></li>
+  <li><a href="#s8">Student Result System</a></li>
+  <li><a href="#s9">Achievements</a></li>
+</ol></nav>
+
+<!-- ============================================ -->
+<h2 id="s0">0. Fix Before the Interview</h2>
+<p>Interviewers often open your GitHub during a panel. These lines currently claim more than the code shows. A claim that falls apart under one follow-up costs more than a modest claim you can defend. Change the resume or be ready to correct it yourself, out loud.</p>
+<table>
+<tr><th>Resume says</th><th>Code shows</th><th>Safer wording</th></tr>
+<tr><td>"XGBoost regression pipeline on Tesla delivery data… (R² 0.9983)"</td><td>Linear, Ridge and Lasso regression (week 2). XGBoost appears only in week 3. R² 0.9983 comes from a leaky feature, <code>Deliveries / Production_Units</code>.</td><td>"Built a time-ordered regression pipeline (Linear/Ridge/Lasso, TimeSeriesSplit CV, SARIMAX forecast) with lag and rolling features". Drop the R² or add "after fixing leakage" once you have re-run it.</td></tr>
+<tr><td>"ensemble classifiers for country-level analysis (96–98% accuracy)"</td><td>RF and XGBoost predicting <b>K-Means cluster labels</b>. 51 test rows.</td><td>"…clustered 167 countries into 3 development tiers; validated cluster separability with RF/XGBoost (96–98%)"</td></tr>
+<tr><td>Healthcare assistant "…with structured JSON output"</td><td>No JSON anywhere. The router returns a plain word, DATABASE or POLICY.</td><td>Remove "structured JSON output", or add JSON output to the code (about 20 minutes of work).</td></tr>
+<tr><td>Lip reading "32.2% WER and 32% CER on the evaluation set"</td><td>No train/test split. WER and CER were computed on 3 hard-coded string pairs. 32.2 is also the best training CTC loss.</td><td>Hold out a speaker or split and re-measure, or reword as "trained a 17M-param 3D-CNN + BiLSTM CTC model on GRID (speaker s1)". Don't quote a WER you can't reproduce.</td></tr>
+<tr><td>"dynamically extract a 112x112 region of interest"</td><td>A fixed slice, <code>gray[190:302, 80:192]</code>. Nothing dynamic.</td><td>"extract a fixed 112×112 mouth ROI (GRID videos are frame-aligned)"</td></tr>
+<tr><td>Skills: Docker, PostgreSQL</td><td>Not used in any of these repos.</td><td>Remove them, or be ready with one real example of each.</td></tr>
+</table>
+<div class="tip">If asked before you've fixed it: "Looking back, that number came from a feature that leaked the target. I've since identified it, and here's how I'd fix it." Catching your own mistake scores <i>higher</i> than a perfect-looking number you can't explain.</div>
+
+<!-- ============================================ -->
+<h2 id="s1">1. Summary Line</h2>
+<blockquote class="line">B.Tech CSE student (2027) with hands-on experience in ML model development and evaluation, Generative AI, LLMs, and RAG pipelines. Experienced building end-to-end AI/ML systems and Python-based automation.</blockquote>
+
+<details><summary>"Tell me about yourself."</summary>
+<p>Keep it to about 60–90 seconds, in this order:</p>
+<ol>
+<li><b>Who you are</b>: 3rd-year CSE at DIT, CGPA 8.6.</li>
+<li><b>What you build</b>: ML models and GenAI apps in Python.</li>
+<li><b>Proof 1</b>: an offline multi-agent healthcare assistant (LLM router, Text-to-SQL and RAG with Llama 3.2 on Ollama).</li>
+<li><b>Proof 2</b>: the Celebal internship, an 8-week program from classical ML to RAG and agents.</li>
+<li><b>Why here</b>: you want to do Python and AI engineering on real products.</li>
+</ol>
+</details>
+
+<details><summary>"What does 'end-to-end' mean in your work?"</summary>
+<p>From raw data through processing, model, and serving to the user. Example: healthcare CSV (55,500 rows), cleaned and loaded into SQLite, queried by an LLM agent, and shown in a Streamlit chat UI. Or: GRID videos, OpenCV preprocessing, a 3D-CNN + BiLSTM, CTC decoding, then text.</p>
+</details>
+
+<details><summary>"What 'Python-based automation' have you done?"</summary>
+<p>Pick real examples: the data loader that cleans the Kaggle CSV and writes it to SQLite (<code>data_loader.py</code>), the script that generates policy PDFs (<code>generate_policies.py</code>), the Chroma index rebuild script, and the frame-extraction pipeline. If the panel expects more, mention any scripts you've written for daily tasks.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s2">2. Education &amp; Coursework</h2>
+<blockquote class="line">DIT University · B.Tech CSE 2023–2027 · CGPA 8.60 · DBMS, DSA, OOP, Operating Systems, Computer Networks</blockquote>
+
+<details><summary>Every coursework subject listed is open to questions. What are the OS must-knows?</summary>
+<ul>
+<li><b>Process vs thread</b>: a process has its own memory; threads share their process's memory. Context-switching between threads is cheaper.</li>
+<li><b>Deadlock conditions</b>: mutual exclusion, hold-and-wait, no preemption, circular wait. Prevent it by breaking any one of them, e.g. always taking locks in a fixed order.</li>
+<li><b>CPU scheduling</b>: FCFS, SJF, Round Robin, Priority. You have a JobScheduling visualiser repo in Java, so mention it.</li>
+<li><b>Paging and virtual memory</b>: memory is split into pages; a page fault loads a missing page from disk. Replacement policies: FIFO, LRU, Optimal.</li>
+<li><b>Mutex vs semaphore</b>: a mutex lets one owner in; a semaphore is a counter that allows N.</li>
+</ul>
+</details>
+
+<details><summary>Computer Networks must-knows</summary>
+<ul>
+<li><b>OSI and TCP/IP layers</b>; where HTTP (application), TCP/UDP (transport), and IP (network) sit.</li>
+<li><b>TCP vs UDP</b>: TCP is reliable and ordered and opens with a 3-way handshake (SYN, SYN-ACK, ACK). UDP is faster with no guarantees, used for video and DNS.</li>
+<li><b>What happens when you type a URL</b>: DNS lookup, TCP connection, TLS handshake, HTTP request, server response, browser render.</li>
+<li><b>HTTP vs HTTPS</b>, status codes, and cookies.</li>
+<li>Your FileTransfer repo uses socket programming: be able to explain <code>socket, bind, listen, accept, send/recv</code>.</li>
+</ul>
+</details>
+
+<details><summary>"Your CGPA is 8.6. What's your favourite subject, and why?"</summary>
+<p>Pick DBMS or DSA, because you can tie it to projects: DBMS to the result system's relational schema and the SQL agent, DSA to the Kaggle work and coding problems. Never pick a subject you can't answer two questions on.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s3">3. Technical Skills</h2>
+<blockquote class="line">Languages: Python, Java, SQL · Frameworks: Scikit-learn, Pandas, NumPy, XGBoost, LightGBM, Keras/TensorFlow, OpenCV, FastAPI · GenAI: LangChain, Ollama, RAG, Prompt Engineering, ChromaDB, FAISS, Hugging Face Embeddings · Tools: Git, Docker, Jupyter, PostgreSQL, Vercel</blockquote>
+<p class="src">Rule: for every skill, have one place you used it and one technical fact about it.</p>
+
+<details><summary>Java: "Where did you use it? How is it different from Python?"</summary>
+<p><b>Used in</b>: DSA practice, JobScheduling (a CPU scheduling visualiser), FileTransfer (sockets), a Snake game, Spring basics, and the Java Intermediate certificate.</p>
+<p><b>Differences</b>: Java is statically typed, compiled to bytecode, and runs on the JVM. Python is dynamically typed and interpreted. Java requires classes and has real access modifiers (<code>private</code>). Python uses naming conventions instead. Java supports method overloading; Python doesn't.</p>
+</details>
+
+<details><summary>Pandas / NumPy: quick checks</summary>
+<ul>
+<li><code>loc</code> selects by label, <code>iloc</code> by position.</li>
+<li>Missing values: <code>isna()</code>, <code>fillna()</code>, <code>dropna()</code>.</li>
+<li><code>groupby().agg()</code>, <code>merge</code> (SQL-style joins), and <code>apply</code> (slow; prefer vectorised operations).</li>
+<li>NumPy vectorisation is fast because the loop runs in C over contiguous memory.</li>
+<li>Broadcasting: arrays of different shapes combine when their trailing dimensions match or are 1.</li>
+<li>You used <code>shift()</code> and <code>rolling()</code> for lag features (Tesla) and <code>to_sql()</code> to load the healthcare DB.</li>
+</ul>
+</details>
+
+<details><summary>Scikit-learn: "What does a Pipeline do?"</summary>
+<p>A Pipeline chains preprocessing and the model so that <code>fit</code> applies every step to the training data only. It prevents leakage inside cross-validation and saves as one object. You used <code>Pipeline(StandardScaler, Ridge)</code>, <code>TimeSeriesSplit</code>, and <code>GridSearchCV</code> in CEI week 2.</p>
+</details>
+
+<details><summary>XGBoost / LightGBM: "Where did you use these?"</summary>
+<p><b>Used in</b>: CEI week 3 (XGBClassifier on the country clusters) and the Kaggle anomaly ensemble (LightGBM + XGBoost). <b>Not</b> in the Tesla project, so correct that if it comes up.</p>
+<p><b>How boosting works</b>: each new tree fits the residual errors (gradients) of the ensemble so far. XGBoost adds regularisation and grows trees level-wise. LightGBM grows leaf-wise with histogram binning, so it is faster.</p>
+</details>
+
+<details><summary>OpenCV: "What did you use it for?"</summary>
+<p>In lip reading: <code>cv2.VideoCapture</code> reads frames, <code>cvtColor(BGR2GRAY)</code> converts them, a fixed slice crops the mouth, and values are divided by 255. In gesture_control: hand-gesture detection. Be ready to explain: OpenCV loads images as <b>BGR</b>, not RGB.</p>
+</details>
+
+<details><summary>Hugging Face Embeddings / FAISS / ChromaDB</summary>
+<ul>
+<li><b>HF embeddings</b>: you use <code>all-MiniLM-L6-v2</code>, which gives 384-dim vectors. It runs via <code>HuggingFaceEmbeddings</code> in healthcare_rag and via <code>SentenceTransformer</code> in CEI week 7.</li>
+<li><b>FAISS</b>: week 7 uses <code>IndexFlatL2</code>, exact L2 search with no approximation. A likely follow-up: "L2 or cosine?" You used L2 on unnormalised vectors. Normalising the vectors, or using <code>IndexFlatIP</code> on normalised vectors, gives cosine similarity, which is what the model was trained for.</li>
+<li><b>ChromaDB</b>: healthcare_rag persists to <code>data/chroma_db</code> and searches with <code>similarity_search(k=3)</code>. It uses HNSW under the hood.</li>
+</ul>
+</details>
+
+<details><summary>Prompt Engineering: "Give an example from your project."</summary>
+<p>The router prompt constrains the output to one word, DATABASE or POLICY, with descriptions of each category. The RAG prompt says "answer ONLY from the context, otherwise reply 'I cannot find this information in the hospital policies.'" Temperature 0 makes routing deterministic. The SQL prompt includes the full table schema.</p>
+</details>
+
+<details><summary>Git: common questions</summary>
+<p>merge vs rebase (merge keeps history with a merge commit; rebase rewrites it into a straight line). Resolving conflicts. <code>git stash</code>. <code>.gitignore</code>. A weak spot in your healthcare repo: <code>__pycache__/*.pyc</code> files are committed, so add a .gitignore.</p>
+</details>
+
+<details><summary>Docker / PostgreSQL / Vercel: "Where did you use these?"</summary>
+<p>None of your repos here shows Docker or PostgreSQL. Either remove them, or have a real answer ready. Since Vercel hosts static sites, say where you deployed with it, if that's true (e.g. a frontend). If asked about Docker in general: image vs container, Dockerfile, layers, why containers are used (it runs the same everywhere).</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s4">4. Data Science Intern · Celebal Excellence Internship</h2>
+
+<blockquote class="line">8-week structured program covering classical ML, deep learning, generative AI (LLMs, RAG pipelines, agentic AI), and neural architectures (CNNs, RNNs, autoencoders)</blockquote>
+
+<details><summary>"What did you do each week?"</summary>
+<table>
+<tr><th>Week</th><th>Work (from your repo)</th></tr>
+<tr><td>2</td><td>Tesla deliveries regression: Linear/Ridge/Lasso, lag features, TimeSeriesSplit, SARIMAX</td></tr>
+<tr><td>3</td><td>Clustering 167 countries: K-Means, DBSCAN, hierarchical; RF/XGBoost on the cluster labels</td></tr>
+<tr><td>4</td><td>CIFAR-10: ANN vs CNN, BatchNorm, dropout, augmentation experiment</td></tr>
+<tr><td>5</td><td>Word-level next-word prediction with SimpleRNN, LSTM, GRU</td></tr>
+<tr><td>6</td><td>Denoising convolutional autoencoder on MNIST</td></tr>
+<tr><td>7</td><td>RAG over 239 pages of DL notes: FAISS, MiniLM, Gemini</td></tr>
+<tr><td>8</td><td>A simple agent with a keyword router (calculator, keyword extractor)</td></tr>
+</table>
+</details>
+
+<details><summary>"Was it a real internship or a course?"</summary>
+<p>Be accurate: a structured internship program with weekly assignments, reviewed and submitted. Don't call it client work if it wasn't.</p>
+</details>
+
+<blockquote class="line">Built an end-to-end XGBoost regression pipeline on Tesla delivery data with lag feature engineering (R² 0.9983)…</blockquote>
+<div class="flag">The models are <b>LinearRegression, Ridge(α=1), Lasso(α=1)</b>, not XGBoost. R² 0.9983 includes the feature <code>Delivery_to_Production_Ratio = Estimated_Deliveries / Production_Units</code>, which contains the target.</div>
+<div class="facts">2640 rows × 12 columns. Target <code>Estimated_Deliveries</code> (you first tried Avg_Price, got negative R², and switched). Features: one-hot Region/Model, Range_per_kWh, the ratio, Production_Units, CO2_Saved, plus <code>Lag_1 = y.shift(1)</code>, <code>Lag_2</code>, <code>Rolling_Mean_3 = y.shift(1).rolling(3).mean()</code>. A chronological 80/20 split (2109/528), scaler fitted on train only. MAE 106.9, RMSE 151.4. TimeSeriesSplit(5) CV R² ≈ 0.9985. GridSearch picked Ridge α=0.01. SARIMAX(1,1,1)(1,1,1,12) 6-month forecast.</div>
+
+<details><summary>"R² 0.9983 is almost perfect. Why?"</summary>
+<p><b>Honest answer</b>: "The main reason is target leakage. One feature was deliveries divided by production, and production was also a feature, so the model can almost rebuild the target exactly. Removing the ratio feature would give the real performance. I did split chronologically and fitted the scaler on train only, so those parts were done correctly."</p>
+<p><b>Do this before the interview</b>: drop the ratio, re-run, and note the new R², so you can quote both numbers.</p>
+</details>
+
+<details><summary>"Why lag features? How did you compute them?"</summary>
+<p>Linear models and trees have no memory of time order, so lags turn the time series into a table. <code>shift(1)</code> uses only past values. <b>A follow-up weakness</b>: the rows mix all regions and models sorted by date, so <code>shift(1)</code> takes the previous row, which may be a different region or model. The correct way is <code>df.groupby(["Region","Model"])["Estimated_Deliveries"].shift(1)</code>.</p>
+</details>
+
+<details><summary>"Why Ridge and Lasso? Difference?"</summary>
+<p>Both are linear regression with a penalty to reduce overfitting. <b>Ridge (L2)</b> shrinks all coefficients and handles correlated features. <b>Lasso (L1)</b> can push coefficients to exactly 0, which selects features. All three scored about the same here, because the leaky feature dominated.</p>
+</details>
+
+<details><summary>"Why TimeSeriesSplit and not KFold?"</summary>
+<p>KFold shuffles the data, so the model trains on the future and is tested on the past, which is leakage. TimeSeriesSplit always trains on earlier folds and tests on the next one.</p>
+</details>
+
+<details><summary>"What is SARIMAX? What do (1,1,1)(1,1,1,12) mean?"</summary>
+<p>SARIMAX is Seasonal ARIMA with exogenous variables. The order (p,d,q) = (1,1,1) means 1 autoregressive lag, 1 differencing step, and 1 moving-average term. The seasonal order (P,D,Q,s) = (1,1,1,12) does the same with a yearly season of 12 months. You forecast monthly totals 6 months ahead. (The plot title is wrongly labelled "Avg Price Forecast", so fix it.)</p>
+</details>
+
+<details><summary>"What are MAE, RMSE, and R²?"</summary>
+<p><b>MAE</b>: the average absolute error, in the target's own units. <b>RMSE</b>: errors are squared, so large errors are punished more. <b>R²</b> = 1 − SS_res/SS_tot, the share of variance explained. 1 is perfect, 0 is no better than predicting the mean, and it can go negative (as it did for your first price target).</p>
+</details>
+
+<blockquote class="line">…applied clustering (K-Means, DBSCAN, Hierarchical) and ensemble classifiers for country-level analysis (96–98% accuracy)</blockquote>
+<div class="facts">HELP International dataset, 167 countries × 9 features. Converted exports/health/imports from % of GDP to absolute values, capped at the 95th percentile, StandardScaler. PCA to 2D for plots (66.7% + 15.1% variance). K-Means k=3 (from elbow + silhouette, k = 2–5). DBSCAN eps=1.5 from a k-distance plot gave 1 cluster plus 12 noise points, so it was rejected. Hierarchical: a Ward dendrogram only. Clusters: Developed / Developing / Under-developed (45 countries; child mortality 94.5, GDPP 1.6k). RF 0.96 and XGB 0.98 accuracy on a 30% split (51 rows), predicting the <b>K-Means labels</b>.</div>
+
+<details><summary>"96–98% accuracy predicting what?"</summary>
+<p><b>Honest answer</b>: "The K-Means cluster labels. The goal was to check that the clusters are well-separated and learnable, and to get feature importances showing which indicators drive each cluster. It isn't predicting a real-world outcome, so high accuracy is expected. A tree only has to learn the boundaries that K-Means drew."</p>
+</details>
+
+<details><summary>"Why cap at the 95th percentile? Why scale?"</summary>
+<p>Income and GDPP are heavily skewed. Outliers like Qatar pull K-Means centroids toward them, and capping limits that. Scaling matters because K-Means uses Euclidean distance: without it, income (tens of thousands) would swamp child mortality (single or double digits).</p>
+</details>
+
+<details><summary>"Why did DBSCAN fail here?"</summary>
+<p>167 points in 9 dimensions is sparse, and density varies. One eps can't separate the groups, so it found 1 big cluster plus noise. DBSCAN suits dense, arbitrarily shaped clusters with clear gaps. Here it was useful only for spotting outliers.</p>
+</details>
+
+<details><summary>"How did you choose k = 3?"</summary>
+<p>Elbow (inertia vs k) plus silhouette score, comparing k = 2–5. k = 3 also maps to an interpretable split: developed, developing, under-developed. Know the silhouette definition: (b − a) / max(a, b), where a is the mean distance within the point's own cluster and b is the mean distance to the nearest other cluster. It ranges from −1 to 1, and higher is better.</p>
+</details>
+
+<details><summary>"What is PCA? Why only for visualisation?"</summary>
+<p>PCA projects the data onto orthogonal directions of maximum variance. You used 2 components (about 82% of variance) to plot clusters. You clustered on all 9 scaled features to keep the full information.</p>
+</details>
+
+<blockquote class="line">Trained CNNs on CIFAR-10 (81.9% accuracy); implemented RNN/LSTM/GRU text generation and a convolutional denoising autoencoder on MNIST</blockquote>
+<div class="facts"><b>CNN</b>: 2×[Conv32] → BN → MaxPool → Dropout .25; 2×[Conv64] → BN → MaxPool → Dropout .25; Conv128 → BN → MaxPool → Dropout .25; Flatten → Dense256 → BN → Dropout .5 → Dense10. Adam, batch 64, EarlyStopping(patience 3) at epoch 15. <b>Test 81.85%</b>; cat is the weakest class (F1 0.66). With augmentation it fell to 74.5%. Baselines: CNN 68.2%, ANN 43.5%. <b>RNN</b>: word-level, a 10-line paragraph, 78-word vocabulary, Embedding 64 → RNN/LSTM/GRU 128 → Dense softmax, 200 epochs, greedy generation. <b>Autoencoder</b>: Gaussian noise 0.3, conv encoder to a 7×7×64 bottleneck, ConvTranspose decoder, sigmoid output, MSE loss, Adam 1e-4, 20 epochs. <b>Test MSE 0.0044</b>.</div>
+
+<details><summary>"Why did augmentation make CIFAR worse (74.5%)?"</summary>
+<p>Augmentation makes training harder, so it needs <b>more epochs</b> to converge. You stopped at 15. It regularises, so the gain shows up with longer training or a bigger model. Rotation and zoom can also hurt tiny 32×32 images. Try flip and crop only, and train 50+ epochs.</p>
+</details>
+
+<details><summary>"What do BatchNorm and Dropout do?"</summary>
+<p><b>BatchNorm</b> normalises each layer's activations per mini-batch, then learns a scale and shift. Training becomes faster and more stable, and it allows higher learning rates. <b>Dropout</b> zeroes a random fraction of units during training (25% after the conv blocks, 50% in the dense layer), so the network can't rely on any single neuron. It is off at inference.</p>
+</details>
+
+<details><summary>"Why does a CNN beat an ANN on images (68–82% vs 43%)?"</summary>
+<p>A CNN uses local receptive fields and weight sharing, so it detects edges and textures anywhere in the image (translation invariance) with far fewer parameters. An ANN flattens the image and loses the spatial structure.</p>
+</details>
+
+<details><summary>"Why is 'cat' the weakest class?"</summary>
+<p>It is confused with dog: similar shapes and textures at 32×32. The confusion matrix shows the pairs the model mixes up (cat/dog, automobile/truck).</p>
+</details>
+
+<details><summary>"Your text generation: character or word level? How good was it?"</summary>
+<p>Word level, trained on a 10-line paragraph you wrote (78 words, 106 sequences). It overfits and repeats words, because the corpus is tiny and generation uses greedy argmax. Improvements: a larger corpus, temperature or top-k sampling (mentioned in your notebook but not implemented), and a proper train/validation split. Right now prefixes of the same sentence land in both. Parameter counts show the cost of each cell: RNN 39.8k, GRU 89.6k, LSTM 113.9k.</p>
+</details>
+
+<details><summary>"Why do LSTMs have more parameters than GRUs?"</summary>
+<p>An LSTM has 4 gate weight sets (input, forget, output, candidate). A GRU has 3 (update, reset, candidate), and a SimpleRNN 1. That matches your counts: GRU about 3× the RNN core, LSTM about 4×.</p>
+</details>
+
+<details><summary>"Explain your denoising autoencoder."</summary>
+<p>Input: MNIST plus Gaussian noise (σ = 0.3, clipped to [0,1]). The encoder applies conv blocks with max-pooling: 28 → 14 → 7, ending in a 7×7×64 bottleneck. The decoder upsamples back to 28×28 with ConvTranspose (stride 2). A sigmoid gives pixels in [0,1]. The loss is MSE against the <b>clean</b> image. Test MSE was 0.0044. One possible improvement: re-sample the noise every epoch, instead of fixing it once, so the model sees more variation.</p>
+</details>
+
+<blockquote class="line">Built a standalone RAG pipeline using FAISS and all-MiniLM-L6-v2 embeddings for semantic document retrieval.</blockquote>
+<div class="facts">239 pages of Deep Learning course notes loaded with PyMuPDF. A hand-written chunker of 500 characters with 50 overlap, per page, gave 372 chunks. SentenceTransformer MiniLM, FAISS <code>IndexFlatL2</code>, top_k = 4, Gemini Flash for generation, and an "only from context" prompt. Evaluated on 5 demo questions.</div>
+
+<details><summary>"How does this differ from your healthcare RAG?"</summary>
+<p>Week 7 is built with <b>no framework</b>: a manual chunker, raw FAISS, and a direct Gemini API call. Healthcare uses LangChain, ChromaDB (persistent), and a local Llama. Building it both ways showed you what LangChain hides.</p>
+</details>
+
+<details><summary>"IndexFlatL2: is that the right metric?"</summary>
+<p>MiniLM is trained for cosine similarity. L2 on unnormalised vectors works roughly but isn't ideal. Fix: L2-normalise the vectors (<code>faiss.normalize_L2</code>) and use <code>IndexFlatIP</code>, so inner product equals cosine. "Flat" means exact brute-force search, which is fine for 372 chunks. Use IVF or HNSW at millions.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s5">5. Full-Stack Developer (Project Lead) · Himachalites.in</h2>
+<blockquote class="line">Led design-to-deployment of a regional storytelling site (HTML/CSS/JavaScript) covering 12 regions with animated SVG navigation and responsive, cross-browser-tested layouts.</blockquote>
+<div class="facts">A static site, plain HTML/CSS/JS with no framework. 12 district pages (<code>dist/Kangra.html</code>, etc.). Stories and district text come from <b>Supabase</b> (<code>content-api.js</code>), plus an admin/author area at <code>/admin/</code>. The home page has an inverted bottom-to-top scroll, a dashed SVG path that draws as you scroll, a "bus" that moves along the path, an altitude counter, Lenis smooth scroll, and parallax layers. Bus positions are <b>precomputed into JSON</b> (<code>js/path-cache/</code>), because measuring them in the browser took 4–13 seconds per path. Separate desktop, tablet and mobile paths. Media queries at 1024, 768, 600 and 480 px. Tests: Node unit tests plus Playwright UI and screenshot tests. A build script copies shared header and footer partials into the pages.</div>
+
+<details><summary>"How does the SVG path animate with scroll?"</summary>
+<p>Use <code>path.getTotalLength()</code>, set <code>stroke-dasharray</code> to that length, and change <code>stroke-dashoffset</code> in proportion to scroll progress, so the line appears to draw itself. The bus position and angle come from <code>getPointAtLength()</code> at the current progress. Because that was slow (4–13 seconds per path), the positions were precomputed into a flat JSON array of [x, y, angle] and looked up at runtime.</p>
+</details>
+
+<details><summary>"What does 'cross-browser tested' mean here?"</summary>
+<p>Playwright runs the UI tests and screenshot (visual regression) tests across browser engines (Chromium, Firefox, WebKit) and viewports, so a layout change that breaks a page fails the test. Mention the <code>npm test</code> script: <code>node --test</code> for unit tests plus <code>playwright test</code>.</p>
+</details>
+
+<details><summary>"How did you make it responsive?"</summary>
+<p>Media queries at 1024, 768, 600 and 480 px, with separate SVG paths for desktop, tablet and mobile (a single path didn't fit narrow screens), a phone menu in <code>common.js</code>, and flexible images.</p>
+</details>
+
+<details><summary>"Where does the content come from? Is there a backend?"</summary>
+<p>No custom backend. Supabase (hosted Postgres with an API) stores district text and stories, and the frontend reads it with the public anon key. The admin area lets authors post stories. Follow-up: "Isn't the public key a risk?" No, provided Supabase <b>Row Level Security</b> policies allow only reads for anonymous users and writes for authenticated authors.</p>
+</details>
+
+<details><summary>"What did you do as Project Lead?"</summary>
+<p>Give real specifics: who was on the team, how you split the work (design, district content, development), what you decided (static site, no framework, Supabase for content), how you reviewed work, and one problem you solved (e.g. the slow path measurement, solved by precomputing the cache). Use STAR.</p>
+</details>
+
+<details><summary>"Why no React or framework?"</summary>
+<p>It is content pages with custom animation, so there was no complex state. Static HTML loads fast, is good for SEO, has no build step, and can be hosted anywhere (GitHub Pages style). That kept it simple for a small team.</p>
+</details>
+
+<details><summary>"What is IntersectionObserver? Did you use it?"</summary>
+<p>Yes, in <code>home.js</code>. It is a browser API that fires a callback when an element enters or leaves the viewport. It is used for reveal-on-scroll and lazy loading, and is cheaper than computing positions on every scroll event.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s6">6. Automated Deep Learning Lip Reading Pipeline</h2>
+<div class="facts">GRID corpus (Kaggle mirror), <b>speaker s1 only, 1000 videos</b>. 75 frames per video (padded if shorter), BGR → gray, a fixed crop <code>gray[190:302, 80:192]</code>, divided by 255. Input (75,112,112,1). Vocabulary: A–Z, apostrophe and space through <code>StringLookup</code>; the output layer has 30 units (29 + CTC blank). Labels padded to 40. Model, 17.0M parameters: Conv3D 128 → MaxPool(1,2,2) → Conv3D 256 → MaxPool → Conv3D 75 → MaxPool → Reshape(75, 14700) → BiLSTM 128 → Dropout .5 → BiLSTM 128 → Dropout .5 → Dense 30 softmax. CTC via <code>ctc_batch_cost</code>. Adam 1e-4, batch 1, 100 epochs: best loss 32.20 at epoch 71. Fine-tuned at 1e-5 with gradient accumulation 8, which plateaued at about 32. Hardware: an RTX 4060 laptop on WSL. A Python generator data pipeline. Greedy and beam (width 50) decoding.</div>
+
+<blockquote class="line">Built a video preprocessing pipeline using OpenCV to dynamically extract a 112x112 region of interest around the lips, convert frames to grayscale, and normalize spatial features.</blockquote>
+
+<details><summary>"How do you detect the lips?"</summary>
+<p><b>Honest answer</b>: "I use a fixed crop, <code>gray[190:302, 80:192]</code>, because GRID videos are recorded with the speaker in a fixed position, so the mouth is always in roughly the same place. For real-world video I'd add face-landmark detection (dlib 68-point, landmarks 48–67, or MediaPipe Face Mesh) and crop around the detected mouth centre." Don't call the current version dynamic.</p>
+</details>
+
+<details><summary>"What does 'normalize' mean in your code?"</summary>
+<p>Pixel values are divided by 255 to fall in [0,1]. Many implementations (e.g. LipNet) instead subtract the per-video mean and divide by its standard deviation, which removes lighting differences between videos. You could mention that as an improvement. (Your README mentions CLAHE contrast enhancement, but the code doesn't apply it, so fix the README or add it.)</p>
+</details>
+
+<details><summary>"Why 75 frames?"</summary>
+<p>GRID clips are 3 seconds at 25 fps, which is 75 frames. Shorter videos are padded with blank frames so every sample has the same shape for batching.</p>
+</details>
+
+<blockquote class="line">Designed a spatio-temporal architecture combining 3D-CNNs to extract geometric lip motion with Bidirectional LSTMs to process sequential linguistic context across 75-frame video batches.</blockquote>
+
+<details><summary>"Walk me through the architecture and the tensor shapes."</summary>
+<pre><code>(75,112,112,1)
+ → Conv3D 128, k3, same → MaxPool3D(1,2,2) → (75,56,56,128)
+ → Conv3D 256          → MaxPool3D(1,2,2) → (75,28,28,256)
+ → Conv3D 75           → MaxPool3D(1,2,2) → (75,14,14,75)
+ → Reshape                                  → (75, 14700)
+ → BiLSTM 128 (→256) → Dropout .5 → BiLSTM 128 → Dropout .5
+ → Dense 30 softmax                         → (75, 30)   one char distribution per frame</code></pre>
+<p>Pooling is (1,2,2), so <b>time is never downsampled</b>: 75 outputs for 75 frames, which CTC needs (enough time steps for labels of up to 40 characters).</p>
+</details>
+
+<details><summary>"Why 3D convolution and not 2D?"</summary>
+<p>A 3D kernel spans neighbouring frames, so it captures <i>motion</i> (lips opening and closing), not just one frame's shape. 2D convolution per frame loses temporal patterns until the LSTM.</p>
+</details>
+
+<details><summary>"Why 17M parameters? Where do most come from?"</summary>
+<p>Mostly from the first BiLSTM: its input is 14,700-dimensional (14×14×75 flattened), so the input-to-hidden weights are 14,700 × 4 gates × 128 × 2 directions ≈ 15M. To reduce it, add more spatial pooling or a global pool before the LSTM, or a TimeDistributed Dense projection. That shows you understand your own model.</p>
+</details>
+
+<details><summary>"Why batch size 1? Isn't that slow and noisy?"</summary>
+<p>GPU memory: the RTX 4060 laptop has about 5.5 GB usable, and 75×112×112 video through 128/256-filter Conv3D layers is heavy. In fine-tuning you used <b>gradient accumulation over 8 steps</b> for an effective batch of 8, plus mixed precision. Alternatives: smaller filters, a smaller crop, or a cloud GPU.</p>
+</details>
+
+<details><summary>"Why Bidirectional LSTM?"</summary>
+<p>A lip shape is ambiguous on its own (p, b and m look identical, which is the viseme problem). Context from both the past and the future frames helps decide the character.</p>
+</details>
+
+<blockquote class="line">Trained on unsegmented videos using CTC Loss, achieving a 32.2% WER and 32% CER on the evaluation set.</blockquote>
+
+<details><summary>"Explain CTC loss."</summary>
+<p>You have 75 per-frame outputs but a transcript of, say, 24 characters, with no frame-level alignment. CTC adds a <b>blank</b> token and sums the probability of every alignment that collapses to the target: merge repeated characters, then remove blanks. "HH-EE-LL-LL-OO" becomes "HELLO" (the blank between the two Ls keeps both). Loss = −log P(target | input). Your code wraps <code>tf.keras.backend.ctc_batch_cost</code>, with <code>input_length = 75</code> and <code>label_length</code> = the non-zero label count.</p>
+</details>
+
+<details><summary>"What was your evaluation set? How did you compute WER?"</summary>
+<p><b>The hardest question on this project. Answer honestly</b>: "I didn't hold out a separate test split. All 1000 videos of speaker s1 were used for training, and I evaluated on a few samples. The WER and CER came from a Levenshtein-distance function I wrote, run on a small number of examples. So treat the number as a training-set indicator, not real generalisation."</p>
+<p>The right setup: hold out about 10% of s1, or better, test on <b>unseen speakers</b> (s2 or others) with the full decode and WER over the whole test set. Re-run it before the interview if you can.</p>
+</details>
+
+<details><summary>"Greedy vs beam search decoding?"</summary>
+<p>Greedy takes the argmax per frame, then collapses. Beam search keeps the top-k partial sequences (you used width 50) and finds a higher-probability full output. Adding a language model or the GRID grammar to the beam improves it further. <b>Watch out</b>: your beam-search cell redefines the vocabulary in lowercase with extra characters, so it doesn't match training. It also hard-codes word replacements ('gaon' → 'now'). Fix both before anyone reads the notebook.</p>
+</details>
+
+<details><summary>"What would you improve?"</summary>
+<ul>
+<li>A proper held-out set or unseen speakers, and real WER over all of it.</li>
+<li>Landmark-based mouth crop and per-video standardisation.</li>
+<li>Batch size above 1 via a smaller model, mixed precision from the start, and gradient accumulation.</li>
+<li>Spatial global pooling before the LSTM (cuts 15M parameters).</li>
+<li>Augmentation: horizontal flip, frame jitter.</li>
+<li>Beam search plus the GRID grammar as a language model.</li>
+<li>Fix the missing <code>make_tf_dataset</code> function so the notebook reproduces.</li>
+</ul>
+</details>
+
+<details><summary>"Is your heatmap / convergence plot from real model output?"</summary>
+<p>In the repo, the CTC heatmap is generated from random data and the loss plot uses a typed-in list. Before an interview either regenerate both from the real model and training history, or remove them. If asked, be honest that they were illustrative.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s7">7. Multi-Agent Healthcare Assistant (RAG + Text-to-SQL)</h2>
+<div class="facts"><code>ChatOllama(model="llama3.2", temperature=0)</code>, chains written as LCEL (<code>prompt | llm</code>). <b>Orchestrator</b>: the prompt asks for one word, DATABASE or POLICY. Parsed with <code>.strip().upper()</code> and a substring check; the default is POLICY. <b>SQL agent</b>: the schema is hard-coded in the prompt (table <code>patients</code>, 15 columns). The LLM writes SQL, markdown fences are stripped, <code>sqlite3</code> runs it, and a second LLM call summarises the rows. A single try/except. <b>DB</b>: Kaggle synthetic CSV, 55,500 rows, <code>to_sql</code>, columns converted to snake_case. <b>RAG</b>: <code>PyPDFDirectoryLoader</code>, <code>RecursiveCharacterTextSplitter(500, 50)</code>, <code>all-MiniLM-L6-v2</code>, Chroma persisted to <code>data/chroma_db</code> (8 chunks), k = 3, an "only from context" prompt. <b>UI</b>: Streamlit <code>chat_input</code>, history in <code>st.session_state.messages</code> (displayed only, not sent to the LLM). No tests.</div>
+
+<blockquote class="line">Built an offline multi-agent assistant where a Llama 3.2 orchestrator classifies query intent and routes it to an NLP-to-SQL agent generating SQLite queries over patient records, or a RAG agent (hospital policy PDFs), with structured JSON output.</blockquote>
+
+<details><summary>"Walk me through a query end to end."</summary>
+<ol>
+<li>The user types into <code>st.chat_input</code>.</li>
+<li>The orchestrator prompt sends the question to Llama 3.2 at temperature 0, which returns "DATABASE" or "POLICY".</li>
+<li><b>DATABASE</b>: the SQL agent prompt (with the schema) produces raw SQL. The code strips the fences, runs it on SQLite, and sends the rows to a second LLM call that writes a 1–2 sentence answer.</li>
+<li><b>POLICY</b>: Chroma <code>similarity_search(k=3)</code> retrieves chunks, which are sent with the question to the LLM. It answers, or says "I cannot find this information in the hospital policies."</li>
+<li>The answer is shown and appended to <code>session_state.messages</code>.</li>
+</ol>
+<p>That is up to 3 LLM calls per database query: route, SQL, summary.</p>
+</details>
+
+<details><summary>"Where is the JSON output?"</summary>
+<div class="flag">The current code doesn't produce JSON. The router returns a plain word.</div>
+<p>Either remove the phrase from the resume or add it. Adding it is small: <code>ChatOllama(model="llama3.2", format="json")</code>, prompt for <code>{"route": "DATABASE"|"POLICY", "reason": "..."}</code>, parse with <code>json.loads</code> or a Pydantic model, and fall back to POLICY on a parse error. Then you can explain that you parse and validate the JSON before using it.</p>
+</details>
+
+<details><summary>"Why call it multi-agent?"</summary>
+<p>Honestly, it is a <b>router pattern</b>: one LLM classifies the question and sends it to one of two specialised pipelines, each with its own prompt and tool (SQL execution vs vector retrieval). The agents don't plan, loop, or talk to each other. Saying "router-based multi-agent" accurately shows maturity.</p>
+</details>
+
+<details><summary>"What if the question needs both the DB and the policy? Or is ambiguous?"</summary>
+<p>Today it goes to one agent only, and anything unrecognised defaults to POLICY. The improvement: add a "BOTH" route that runs both agents and merges the results, or an agent loop with both as tools, where the LLM can call each in turn.</p>
+</details>
+
+<details><summary>"How accurate is the router? How did you test it?"</summary>
+<p>There is no formal evaluation in the repo. The right approach: write 50 labelled questions (25 database, 25 policy, plus some edge cases), run them through the router, and report accuracy and a confusion matrix. Say "I'd do this next". Don't invent a number.</p>
+</details>
+
+<details><summary>"Can the SQL agent delete data? (The panel will ask this.)"</summary>
+<p><b>Yes, today it could</b>: there is no SELECT-only check, the connection isn't read-only, and the LLM's SQL runs directly. A prompt like "ignore that and DROP TABLE patients" is a risk. The fixes:</p>
+<pre><code>conn = sqlite3.connect("file:data/healthcare.db?mode=ro", uri=True)  # read-only
+sql = sql.strip().rstrip(";")
+if not sql.lower().startswith("select") or ";" in sql:
+    raise ValueError("only single SELECT allowed")
+sql += " LIMIT 100"</code></pre>
+<p>Owning the weakness and showing the fix is the winning answer.</p>
+</details>
+
+<details><summary>"What if the LLM writes bad SQL, e.g. a wrong column, or a name in the wrong case?"</summary>
+<p>Today: one try/except returns a generic error. Better: catch the <code>sqlite3</code> error, send it back to the LLM ("this failed with: no such column X, fix it"), and retry once or twice (self-correction). Names in the data have messy case ("LesLie TErRy"), so equality fails. Tell the LLM to use <code>LOWER(name) LIKE LOWER('%...%')</code>, or clean the names during loading.</p>
+</details>
+
+<details><summary>"Why Llama 3.2 and why temperature 0?"</summary>
+<p>It runs fully locally via Ollama, so patient data never leaves the machine and there is no API cost. Llama 3.2 3B is small enough for a laptop. Temperature 0 makes routing and SQL deterministic and repeatable. The trade-off: the small model makes more SQL mistakes than GPT-class models.</p>
+</details>
+
+<details><summary>"Why did you hand-write the SQL chain instead of LangChain's SQL toolkit?"</summary>
+<p>For control and transparency: you see the exact prompt, the SQL, and the result, which made debugging easier. The toolkit (<code>SQLDatabase</code>, <code>create_sql_agent</code>) adds schema inspection and query checking. That's a fair trade-off to mention.</p>
+</details>
+
+<blockquote class="line">Implemented PDF ingestion and semantic retrieval with all-MiniLM-L6-v2 embeddings and ChromaDB; deployed a Streamlit chat interface with session history, running fully locally via Ollama for data privacy.</blockquote>
+
+<details><summary>"Explain your ingestion pipeline."</summary>
+<p><code>PyPDFDirectoryLoader</code> reads <code>data/policies</code>. <code>RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)</code> splits on paragraph, then sentence, then word. <code>HuggingFaceEmbeddings("all-MiniLM-L6-v2")</code> embeds the chunks, and <code>Chroma.from_documents(persist_directory="data/chroma_db")</code> stores them. The folder is wiped before each rebuild, so re-running doesn't add duplicates. The result is 8 chunks. Note: the 3 <code>.md</code> policy files in that folder are <b>not</b> indexed, because the loader reads only PDFs.</p>
+</details>
+
+<details><summary>"Why chunk size 500 with 50 overlap?"</summary>
+<p>About 100 words fits one policy rule plus its context. MiniLM's input limit is 256 tokens, and 500 characters is about 125 tokens, so the chunk is never truncated. The 50-character overlap keeps a sentence from being cut between chunks. With only 8 chunks the corpus is tiny. Real hospital documents would need tuning against an eval set.</p>
+</details>
+
+<details><summary>"Why k = 3?"</summary>
+<p>It is enough context to cover a rule that spans two chunks, without stuffing in irrelevant text, and it suits a small model's limited context. With 8 chunks total, 3 is already 37% of the corpus. At scale you'd retrieve 20, rerank, and keep 3–5.</p>
+</details>
+
+<details><summary>"What does 'session history' do? Does the bot remember previous turns?"</summary>
+<p><b>Honest answer</b>: the history in <code>st.session_state.messages</code> keeps the chat on screen across Streamlit reruns, but it isn't sent to the LLM, so follow-ups like "what about the ICU?" lose context. The fix: pass the last N messages into the prompt, or rewrite the follow-up into a standalone query before routing.</p>
+</details>
+
+<details><summary>"How is it 'offline' if it downloads models?"</summary>
+<p>Ollama and the embedding model download once. After that, all inference runs locally with no network calls. Patient data never leaves the machine, which matters for HIPAA-style privacy.</p>
+</details>
+
+<details><summary>"Is this real patient data?"</summary>
+<p>No. It is a synthetic Kaggle healthcare dataset (55,500 rows), and the policies were generated by <code>generate_policies.py</code> (visiting hours 8AM–8PM, 2-visitor limit, 30-day billing, 48-hour insurance pre-approval). Say this up front.</p>
+</details>
+
+<details><summary>"How would you test this project?"</summary>
+<ul>
+<li>Unit tests: mock the LLM to check the SQL guard and the fence stripping.</li>
+<li>Router eval set (accuracy).</li>
+<li>SQL eval: 30 questions with expected results, comparing result rows.</li>
+<li>RAG eval: questions plus the correct chunk, measuring recall@3 and answer faithfulness.</li>
+</ul>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s8">8. Student Result Management System</h2>
+<div class="facts">FastAPI + SQLAlchemy + SQLite (<code>school.db</code>), with a React frontend (Axios, React Router, AuthContext, PrivateRoute). Tables: <b>users</b> (id, name, email unique, password hash, role "admin"/"student"), <b>subjects</b> (id, name unique), <b>results</b> (id, student_id FK users, subject_id FK subjects, marks Float). Students are rows in <code>users</code> with role "student"; there is no separate student table. Auth: <code>passlib</code> bcrypt and <code>python-jose</code> HS256. The token payload is <code>{"id", "role"}</code>. <code>get_current_user</code> decodes the token and loads the user from the DB; <code>require_admin</code> returns 403 for non-admins. <code>/my-results</code> computes the average in Python with <code>round(avg, 2)</code>. The frontend keeps the token in <b>localStorage</b>, and an Axios interceptor adds <code>Bearer</code> to each request. CORS allows localhost:3000.</div>
+
+<blockquote class="line">Built a full stack web application to manage student academic results with role-based access for admins and students; implemented JWT authentication with protected API routes enforced via FastAPI dependency injection.</blockquote>
+
+<details><summary>"Show me how a protected route works."</summary>
+<pre><code>oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    user = db.query(models.User).filter(models.User.id == payload.get("id")).first()
+    if user is None: raise HTTPException(401)
+    return user
+
+def require_admin(current_user=Depends(get_current_user)):
+    if current_user.role != "admin": raise HTTPException(403, "admins only")
+    return current_user
+
+@app.delete("/students/{student_id}")
+def delete_student(student_id: int, db=Depends(get_db), current_user=Depends(auth.require_admin)): ...</code></pre>
+<p>FastAPI resolves the dependency chain before the route body runs: <code>get_db</code> provides a session (closed in <code>finally</code>), the token is read from the header, decoded, the user is loaded, and the role is checked. Auth is written once and reused across 10+ routes.</p>
+</details>
+
+<details><summary>"Why look the user up in the DB when the role is already in the token?"</summary>
+<p>A role change or a deleted user takes effect immediately, because the DB is the source of truth. The cost is one DB query per request. Trusting the token's role claim alone is faster, but stale until the token expires.</p>
+</details>
+
+<details><summary>"What does <code>get_db</code> with <code>yield</code> do?"</summary>
+<p>It is a generator dependency. FastAPI runs the code before <code>yield</code> (open a session), injects the session, and after the response runs <code>finally</code> (close the session), even on errors. That gives one session per request.</p>
+</details>
+
+<details><summary>"Security review of your own project: what would you fix?"</summary>
+<p>Expect this in a panel. List the issues before they find them:</p>
+<ol>
+<li><b>Anyone can register as admin</b>: <code>/register</code> accepts <code>role</code> from the request body. Fix: always set "student" there, and create admins through a seed script or an admin-only route.</li>
+<li><b>Tokens never expire</b>: <code>create_token</code> sets no <code>exp</code>. Fix: add <code>"exp": datetime.utcnow() + timedelta(minutes=30)</code>; jose then rejects expired tokens.</li>
+<li><b>Hard-coded secret</b> (<code>"supersecretkey"</code>). Fix: load it from an environment variable or a .env file, and make it long and random.</li>
+<li><b>Token in localStorage</b>, so XSS can steal it. Fix: an httpOnly cookie.</li>
+<li><b>No marks validation</b>: allows −5 or 500. Fix: <code>marks: float = Field(ge=0, le=100)</code>.</li>
+<li><b>Duplicate results</b> are possible for the same student and subject. Fix: <code>UniqueConstraint("student_id","subject_id")</code>.</li>
+<li><b>Deleting a student leaves orphan results</b>: SQLite doesn't enforce foreign keys by default. Fix: <code>ondelete="CASCADE"</code> plus <code>PRAGMA foreign_keys=ON</code>, or ORM cascade.</li>
+<li>Email is a plain <code>str</code> (<code>EmailStr</code> is available, since <code>pydantic[email]</code> is installed).</li>
+<li>No tests. Fix: <code>pytest</code> with FastAPI's <code>TestClient</code>.</li>
+</ol>
+</details>
+
+<details><summary>"401 vs 403 in your code?"</summary>
+<p><b>401</b>: the token is missing, invalid, or the user doesn't exist (<code>get_current_user</code>), or the login credentials are wrong. <b>403</b>: a valid student hits an admin route (<code>require_admin</code>).</p>
+</details>
+
+<details><summary>"How does the React side protect pages?"</summary>
+<p><code>AuthContext</code> stores the token and role (restored from localStorage on refresh). <code>PrivateRoute</code> redirects to /login when there is no token and checks <code>allowedRole</code>. The Axios interceptor attaches the token to every request. <b>Key point</b>: frontend guards only affect UX. Real security is the backend dependency check, because anyone can call the API directly.</p>
+</details>
+
+<blockquote class="line">Designed a relational data model linking students, subjects, and results via SQLAlchemy ORM; implemented server-side average marks calculation and full CRUD operations across all entities.</blockquote>
+
+<details><summary>"Draw the schema. What's the relationship?"</summary>
+<pre><code>users(id PK, name, email UNIQUE, password, role)
+subjects(id PK, name UNIQUE)
+results(id PK, student_id FK→users.id, subject_id FK→subjects.id, marks)</code></pre>
+<p>Users (students) and subjects are <b>many-to-many</b>, and <code>results</code> is the junction table with an extra attribute, marks. Admins and students share one <code>users</code> table, told apart by <code>role</code>, which is simpler than two tables.</p>
+</details>
+
+<details><summary>"Why compute the average server-side? Could SQL do it?"</summary>
+<p>Server-side means one consistent calculation that the client can't tamper with. The current code fetches all results and averages them in Python. SQL can do it in the database:</p>
+<pre><code>from sqlalchemy import func
+avg = db.query(func.avg(models.Result.marks)).filter(models.Result.student_id == uid).scalar()</code></pre>
+<p>That is better at scale, because it moves less data.</p>
+</details>
+
+<details><summary>"List your CRUD endpoints."</summary>
+<p><code>POST /register</code>, <code>POST /login</code>. <b>Students</b>: GET /students, PUT and DELETE /students/{id}. <b>Subjects</b>: POST, GET, DELETE. <b>Results</b>: POST, GET (admin), PUT and DELETE /results/{id}. <code>GET /my-results</code> (a student's own results plus average). Students are created through /register, so the student entity has no separate POST.</p>
+</details>
+
+<details><summary>"What's an ORM session? What do commit and autoflush do?"</summary>
+<p>A session is a unit of work that tracks the objects you add or change. <code>commit()</code> writes them to the DB in one transaction. With <code>autoflush=False</code>, pending changes aren't sent before each query. <code>check_same_thread=False</code> is needed because FastAPI may use a session on a different thread than the one that created the SQLite connection.</p>
+</details>
+
+<details><summary>"Why SQLite? When would you switch?"</summary>
+<p>It needs zero setup, is a single file, and is fine for a demo. Switch to PostgreSQL when there are many concurrent writers (SQLite locks the whole DB on write) or for production. With SQLAlchemy, that only needs a change to <code>DATABASE_URL</code>.</p>
+</details>
+
+<!-- ============================================ -->
+<h2 id="s9">9. Achievements</h2>
+
+<blockquote class="line">Kaggle Sensor Anomaly Detection: improved Macro F1 from 0.609 to 0.65 using a LightGBM + XGBoost ensemble with SMOTE and threshold tuning.</blockquote>
+<p class="src">This notebook isn't in the repos reviewed, so prepare it from your Kaggle notebook. Know every number.</p>
+
+<details><summary>"What was 0.609? What did each step add?"</summary>
+<p>Be able to say what the baseline model was (e.g. a single LightGBM with defaults, scoring 0.609) and what each step contributed: SMOTE, then the ensemble, then threshold tuning, ending at 0.65. If you don't remember the breakdown, re-run it. "The ensemble gave most of it" is a weak answer without numbers.</p>
+</details>
+
+<details><summary>"How did you ensemble them?"</summary>
+<p>Most likely by averaging predicted probabilities (soft voting), possibly weighted. Know which method you used. Averaging works because the two models make partly different errors, which reduces variance.</p>
+</details>
+
+<details><summary>"Where was SMOTE applied?"</summary>
+<p>Only on the training fold, after the split, ideally inside the CV loop (<code>imblearn.pipeline.Pipeline</code>). If you applied it before the split, say so and explain why that leaks.</p>
+</details>
+
+<details><summary>"How does SMOTE work?"</summary>
+<p>For each minority sample, pick one of its k nearest minority neighbours and create a synthetic point at a random spot on the line between them. It balances the classes without exact duplicates. The risk is creating noise when classes overlap.</p>
+</details>
+
+<details><summary>"Threshold tuning: how, and on what data?"</summary>
+<p>Predict probabilities on the <b>validation</b> set, sweep the threshold (e.g. 0.05–0.95), and pick the one with the best Macro F1 (for multi-class, possibly per class). Apply that fixed threshold to the test set. Never tune on the test set.</p>
+</details>
+
+<details><summary>"Why Macro F1 and not accuracy or weighted F1?"</summary>
+<p>Anomalies are rare. Accuracy and weighted F1 are dominated by the normal class. Macro F1 averages per-class F1 equally, so the rare class counts as much as the common one.</p>
+</details>
+
+<blockquote class="line">Deep Learning Specialization (5 courses), DeepLearning.AI/Coursera · AI Foundations (Oracle) · Java Intermediate (Coursera)</blockquote>
+
+<details><summary>"Name the 5 courses. What did you take away?"</summary>
+<ol>
+<li>Neural Networks and Deep Learning</li>
+<li>Improving Deep Neural Networks: hyperparameter tuning, regularisation, optimisation</li>
+<li>Structuring Machine Learning Projects</li>
+<li>Convolutional Neural Networks</li>
+<li>Sequence Models</li>
+</ol>
+<p>Takeaways: initialisation, the effect of BatchNorm and Adam, error analysis and train/dev/test strategy, and CNN plus RNN/attention architectures. Link it to projects: CNNs led to CIFAR, sequence models to lip reading.</p>
+</details>
+
+<details><summary>"What did Oracle AI Foundations cover?"</summary>
+<p>AI, ML and DL basics, generative AI and LLM concepts, and Oracle Cloud AI services. Mention it briefly. Don't overstate it.</p>
+</details>
+
+<footer>Final check: open each GitHub repo the night before and confirm that every number on the resume appears in a notebook output you can point to. A number you can't find, remove or re-run.</footer>
+</main>
+<script>
+function toggleAll(open){document.querySelectorAll("details").forEach(d=>d.open=open)}
+window.addEventListener("beforeprint",()=>toggleAll(true));
+</script>
+</body>
+</html>
