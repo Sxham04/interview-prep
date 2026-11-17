@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mini Project Viva Sheet — Fuzzy Logic &amp; Neural Network</title>
+<link rel="stylesheet" href="assets/fuzzy-notes.css">
+</head>
+<body>
+<main>
+<header class="unit">
+  <div class="kicker">Fuzzy Logic &amp; Neural Network · CSN441 · Mini Project Viva</div>
+  <h1>Waste Classification Using Images — viva sheet</h1>
+  <p class="src">Project 4. Code: <code>train.py</code>, <code>predict.py</code> in <code>D:\files\stud\fuzzy\miniproject</code>. Every number here comes from the actual training run (<code>outputs/train_log.txt</code>). Back: <a href="index.html">Interview Prep</a></p>
+</header>
+
+<nav class="toc"><b>Contents</b>
+<ol>
+  <li><a href="#pitch">30-second pitch</a></li>
+  <li><a href="#glance">Project at a glance</a></li>
+  <li><a href="#problem">Problem definition</a></li>
+  <li><a href="#data">Dataset</a></li>
+  <li><a href="#prep">Preprocessing</a></li>
+  <li><a href="#cnn">CNN concepts</a></li>
+  <li><a href="#model">Model: ResNet18 + transfer learning</a></li>
+  <li><a href="#train">Training</a></li>
+  <li><a href="#eval">Evaluation metrics</a></li>
+  <li><a href="#results">Results &amp; analysis</a></li>
+  <li><a href="#demo">Demonstration</a></li>
+  <li><a href="#code">Code walkthrough</a></li>
+  <li><a href="#syllabus">Link to the syllabus</a></li>
+  <li><a href="#qa">Likely viva questions</a></li>
+  <li><a href="#nums">Numbers to remember</a></li>
+</ol></nav>
+
+<!-- ============================================================ -->
+<h2 id="pitch">1. 30-second pitch</h2>
+<div class="def"><b>Say this first:</b> "We built a CNN that looks at a photo of one waste item and classifies it as cardboard, glass, metal, paper, plastic or trash. We used the TrashNet dataset of 2,527 images and fine-tuned a ResNet18 pre-trained on ImageNet (transfer learning). On 380 unseen test images it gets <b>90.8% accuracy</b> and a macro F1-score of <b>0.902</b>. Its main mistakes are between shiny or transparent materials, plastic vs glass vs metal."</div>
+<div class="tip">Keep the opening short and let the examiner pick what to dig into. Every section below is one likely direction they'll take.</div>
+
+<!-- ============================================================ -->
+<h2 id="glance">2. Project at a glance</h2>
+<table>
+<tr><th>Item</th><th>Value</th></tr>
+<tr><td>Task</td><td>Image classification, single label, 6 classes</td></tr>
+<tr><td>Dataset</td><td>TrashNet (Thung &amp; Yang, Stanford, 2016): 2,527 images</td></tr>
+<tr><td>Split</td><td>70 / 15 / 15 stratified → 1768 train, 379 validation, 380 test</td></tr>
+<tr><td>Model</td><td>ResNet18 (18-layer residual CNN), ImageNet weights, new 6-class head</td></tr>
+<tr><td>Input</td><td>224 × 224 × 3 RGB, ImageNet-normalized</td></tr>
+<tr><td>Loss / optimizer</td><td>Cross-entropy / Adam, lr = 0.0001, cosine annealing</td></tr>
+<tr><td>Epochs / batch</td><td>15 / 32 (56 batches per epoch)</td></tr>
+<tr><td>Best epoch</td><td>8 (validation accuracy 92.6%)</td></tr>
+<tr><td>Test result</td><td>Accuracy 90.8% (345/380), macro F1 0.902</td></tr>
+<tr><td>Tools</td><td>Python 3.12, PyTorch 2.11, torchvision, scikit-learn, matplotlib, seaborn</td></tr>
+<tr><td>Hardware</td><td>NVIDIA RTX 4060 Laptop GPU (CUDA)</td></tr>
+</table>
+
+<h3>Pipeline</h3>
+<ol class="steps">
+  <li><b>Dataset</b>: download TrashNet, one folder per class.</li>
+  <li><b>Preprocess</b>: stratified split, resize to 224, normalize, augment the training set.</li>
+  <li><b>Model</b>: load pre-trained ResNet18, replace the last layer with Dropout + Linear(512 → 6).</li>
+  <li><b>Train</b>: 15 epochs of Adam + cross-entropy; keep the checkpoint with the best validation accuracy.</li>
+  <li><b>Evaluate</b>: run the test set once; compute accuracy, precision, recall, F1 and the confusion matrix.</li>
+  <li><b>Demo</b>: <code>predict.py</code> classifies any new photo with top-3 confidences.</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="problem">3. Problem definition</h2>
+<ul>
+  <li><b>Problem:</b> wrong sorting sends recyclable material to landfill and contaminates recycling streams. Manual sorting is slow, costly and unhygienic.</li>
+  <li><b>Objective:</b> automatically classify a waste item from its photo into 6 categories, with at least 85% test accuracy.</li>
+  <li><b>Intended use:</b> a camera on a smart bin or a recycling-plant conveyor belt, or a mobile app that tells users which bin to use.</li>
+  <li><b>Type of ML problem:</b> supervised learning, multi-class classification. Input: an image. Output: one of 6 labels plus a probability for each.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="data">4. Dataset — TrashNet</h2>
+<table>
+<tr><th>Class</th><th>Images</th><th>Share</th><th>Test images</th></tr>
+<tr><td>cardboard</td><td>403</td><td>15.9%</td><td>60</td></tr>
+<tr><td>glass</td><td>501</td><td>19.8%</td><td>76</td></tr>
+<tr><td>metal</td><td>410</td><td>16.2%</td><td>62</td></tr>
+<tr><td>paper</td><td>594</td><td>23.5%</td><td>89</td></tr>
+<tr><td>plastic</td><td>482</td><td>19.1%</td><td>73</td></tr>
+<tr><td>trash</td><td>137</td><td>5.4%</td><td>20</td></tr>
+<tr><td><b>Total</b></td><td><b>2527</b></td><td>100%</td><td><b>380</b></td></tr>
+</table>
+<ul>
+  <li><b>Source:</b> collected by Gary Thung and Mindy Yang for a Stanford CS229 project (2016). Downloaded from Hugging Face (<code>garythung/trashnet</code>, file <code>dataset-resized.zip</code>).</li>
+  <li>Each photo shows <b>one object on a white background</b>, 512 × 384 pixels.</li>
+  <li><b>Imbalanced:</b> trash has only 137 images, about 4× fewer than paper. This explains why trash has the lowest recall.</li>
+  <li><b>Labelling:</b> the folder name is the label (<code>ImageFolder</code> sorts the folders alphabetically: cardboard = 0 … trash = 5).</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="prep">5. Data preprocessing</h2>
+<table>
+<tr><th>Step</th><th>What</th><th>Why</th></tr>
+<tr><td>Stratified split</td><td>70/15/15, seed 42</td><td>Each set keeps the same class proportions; the fixed seed makes it reproducible</td></tr>
+<tr><td>Resize</td><td>224 × 224</td><td>The input size ResNet18 was pre-trained on</td></tr>
+<tr><td>ToTensor</td><td>Pixels 0–255 → 0–1, shape H×W×C → C×H×W</td><td>The format PyTorch expects</td></tr>
+<tr><td>Normalize</td><td>(x − mean) / std with ImageNet mean (0.485, 0.456, 0.406) and std (0.229, 0.224, 0.225)</td><td>The pre-trained weights expect inputs on the same scale they were trained with</td></tr>
+<tr><td>Augmentation (train only)</td><td>Random crop (70–100%), horizontal flip, ±15° rotation, colour jitter</td><td>Creates new variations every epoch → less overfitting on a small dataset</td></tr>
+</table>
+<div class="def"><b>Train / validation / test:</b> the <b>training set</b> updates the weights. The <b>validation set</b> chooses the best epoch (model selection). The <b>test set</b> is used <b>once</b> at the end, so the reported accuracy is an honest estimate on unseen data.</div>
+<div class="tip">Why no augmentation on validation/test? Those sets must measure performance on real, unchanged images. Random changes would make the score noisy and not reproducible.</div>
+<pre>train_tf = transforms.Compose([
+    transforms.RandomResizedCrop(224, scale=(0.7, 1.0)),   # random zoom/crop, output 224x224
+    transforms.RandomHorizontalFlip(),                     # mirror 50% of the time
+    transforms.RandomRotation(15),                         # rotate -15..+15 degrees
+    transforms.ColorJitter(0.2, 0.2, 0.2),                 # brightness, contrast, saturation
+    transforms.ToTensor(),
+    transforms.Normalize(MEAN, STD),
+])</pre>
+<pre>tr, rest = train_test_split(idx, test_size=0.30, stratify=labels, random_state=SEED)       # 70% train
+va, te   = train_test_split(rest, test_size=0.50, stratify=labels[rest], random_state=SEED) # 15% / 15%</pre>
+<p>The second split halves the remaining 30%. <code>stratify=</code> keeps class ratios equal in every set.</p>
+
+<!-- ============================================================ -->
+<h2 id="cnn">6. CNN concepts (expect theory questions)</h2>
+<div class="def"><b>Convolutional Neural Network (CNN):</b> a neural network for grid data such as images. Convolution layers slide small learnable filters (e.g. 3×3) over the image to detect local patterns. Pooling layers shrink the feature maps. Fully connected layers at the end make the decision.</div>
+<table>
+<tr><th>Layer / idea</th><th>What it does</th></tr>
+<tr><td><b>Convolution</b></td><td>Each filter is multiplied with each image patch and summed → a feature map. Early layers find edges and colours, middle layers find textures and shapes, deep layers find object parts.</td></tr>
+<tr><td><b>Weight sharing</b></td><td>The same filter is used at every position → far fewer parameters than a dense layer, and a pattern is detected wherever it appears (translation invariance).</td></tr>
+<tr><td><b>Stride / padding</b></td><td>Stride = step size of the filter (stride 2 halves the size). Padding adds a border so the size is kept.</td></tr>
+<tr><td><b>ReLU</b></td><td>f(x) = max(0, x). Non-linear, cheap, and avoids vanishing gradients (unlike sigmoid).</td></tr>
+<tr><td><b>Pooling</b></td><td>Max pooling keeps the largest value in each window → smaller maps, some position tolerance.</td></tr>
+<tr><td><b>Batch normalization</b></td><td>Normalizes each layer's outputs per mini-batch → faster, more stable training.</td></tr>
+<tr><td><b>Global average pooling</b></td><td>Averages each 7×7 feature map to one number → a 512-value feature vector.</td></tr>
+<tr><td><b>Fully connected + softmax</b></td><td>Maps features to 6 scores; softmax turns them into probabilities that sum to 1.</td></tr>
+<tr><td><b>Dropout</b></td><td>During training, randomly zeroes 30% of the features → stops the network relying on a few features (regularization).</td></tr>
+</table>
+<span class="eq">softmax(z<sub>i</sub>) = e<sup>z<sub>i</sub></sup> / Σ<sub>j</sub> e<sup>z<sub>j</sub></sup></span>
+<span class="eq">Conv output size = (W − F + 2P) / S + 1  &nbsp;(e.g. 224, F=7, P=3, S=2 → 112)</span>
+
+<!-- ============================================================ -->
+<h2 id="model">7. Model — ResNet18 with transfer learning</h2>
+<h3>Residual connection (the "Res" in ResNet)</h3>
+<div class="def"><b>Residual block:</b> output = F(x) + x. The block learns only the <i>change</i> F(x) to its input, and the input skips ahead unchanged. Gradients flow back through the skip path, so very deep networks can be trained without vanishing gradients. (He et al., 2015)</div>
+<h3>Transfer learning</h3>
+<div class="def"><b>Transfer learning:</b> start from weights already learned on a big dataset (ImageNet: 1.2 million images, 1000 classes) instead of random weights, then <b>fine-tune</b> on our small dataset. Edge, texture and shape detectors are general, so they carry over to waste images.</div>
+<ul>
+  <li>Why: 2,527 images is far too few to train an 11-million-parameter CNN from scratch. It would overfit. Transfer learning gives high accuracy in a few minutes.</li>
+  <li>We fine-tune the <b>whole network</b> with a <b>small learning rate</b> (0.0001), so the pre-trained features are adjusted gently, not destroyed.</li>
+  <li>Only the final layer is new: <code>Dropout(0.3) → Linear(512, 6)</code>, replacing the original <code>Linear(512, 1000)</code>.</li>
+</ul>
+<h3>Shape flow through the network</h3>
+<table class="mono">
+<tr><th>Stage</th><th>Output shape</th></tr>
+<tr><td>Input image</td><td>3 × 224 × 224</td></tr>
+<tr><td>Conv 7×7, stride 2 + BN + ReLU</td><td>64 × 112 × 112</td></tr>
+<tr><td>Max pool 3×3, stride 2</td><td>64 × 56 × 56</td></tr>
+<tr><td>Residual stage 1 (2 blocks)</td><td>64 × 56 × 56</td></tr>
+<tr><td>Residual stage 2</td><td>128 × 28 × 28</td></tr>
+<tr><td>Residual stage 3</td><td>256 × 14 × 14</td></tr>
+<tr><td>Residual stage 4</td><td>512 × 7 × 7</td></tr>
+<tr><td>Global average pool</td><td>512</td></tr>
+<tr><td>Dropout + Linear</td><td>6 scores → softmax → 6 probabilities</td></tr>
+</table>
+<p>18 layers with weights = 1 first conv + 16 convs in 8 residual blocks + 1 fully connected. About <b>11.18 million parameters</b>; the new head has 512 × 6 + 6 = 3,078.</p>
+<pre>def build_model(n_classes):
+    m = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)   # ImageNet weights
+    m.fc = nn.Sequential(nn.Dropout(0.3), nn.Linear(m.fc.in_features, n_classes))  # 512 -> 6
+    return m</pre>
+<h3>Why a CNN and not an RNN/LSTM?</h3>
+<p>An RNN/LSTM models <b>sequences</b> over time (video frames, text). Our input is a <b>single still image</b> with no time order, so an LSTM adds nothing. A CNN is the right tool for spatial patterns.</p>
+
+<!-- ============================================================ -->
+<h2 id="train">8. Training</h2>
+<table>
+<tr><th>Setting</th><th>Value</th><th>Reason</th></tr>
+<tr><td>Loss</td><td>Cross-entropy</td><td>Standard for multi-class classification; heavily penalizes a confident wrong answer</td></tr>
+<tr><td>Optimizer</td><td>Adam</td><td>Adaptive learning rate per weight (momentum + RMSprop); converges fast with little tuning</td></tr>
+<tr><td>Learning rate</td><td>0.0001</td><td>Small, so pre-trained weights are only fine-tuned</td></tr>
+<tr><td>Scheduler</td><td>Cosine annealing</td><td>LR decreases smoothly to ~0 by epoch 15 → big steps early, fine steps late</td></tr>
+<tr><td>Batch size</td><td>32</td><td>Fits GPU memory; 56 weight updates per epoch</td></tr>
+<tr><td>Epochs</td><td>15</td><td>Validation accuracy plateaus around epoch 8–15</td></tr>
+<tr><td>Checkpointing</td><td>Save when val accuracy improves</td><td>Keeps the best model (epoch 8), not just the last</td></tr>
+</table>
+<span class="eq">Cross-entropy loss L = − log p<sub>true class</sub> &nbsp; (p = 0.9 → 0.105; p = 0.1 → 2.303)</span>
+<h3>One training step (what <code>run_epoch</code> does per batch)</h3>
+<ol class="steps">
+  <li><b>Forward pass:</b> <code>out = model(x)</code> gives 6 scores per image.</li>
+  <li><b>Loss:</b> <code>loss_fn(out, y)</code> compares the scores with the true labels.</li>
+  <li><b>Clear gradients:</b> <code>opt.zero_grad()</code>, because PyTorch accumulates them otherwise.</li>
+  <li><b>Backpropagation:</b> <code>loss.backward()</code> computes ∂L/∂w for every weight (chain rule).</li>
+  <li><b>Update:</b> <code>opt.step()</code> moves each weight against its gradient (Adam's version of w ← w − η·∂L/∂w).</li>
+</ol>
+<pre>with torch.set_grad_enabled(opt is not None):   # gradients only when training
+    for x, y in loader:
+        x, y = x.to(device), y.to(device)       # move batch to GPU
+        out = model(x)
+        loss = loss_fn(out, y)
+        if opt:                                 # training mode
+            opt.zero_grad(); loss.backward(); opt.step()
+        p = out.argmax(1)                       # predicted class = highest score</pre>
+<p>The same function serves training and evaluation. With <code>opt=None</code>, gradients are off and dropout is disabled (<code>model.train(False)</code> = eval mode).</p>
+<figure><img src="assets/viva/training_curves.png" alt="Training and validation loss and accuracy per epoch"><figcaption>Training accuracy reaches 99.5%; validation levels off around 91–92%. The gap (~8%) is mild overfitting.</figcaption></figure>
+<div class="def"><b>Overfitting:</b> the model memorizes training images, so training accuracy is much higher than validation accuracy. <b>Controls used here:</b> data augmentation, dropout 0.3, pre-trained weights, a small LR, and selecting the best-validation checkpoint (similar to early stopping).</div>
+
+<!-- ============================================================ -->
+<h2 id="eval">9. Evaluation metrics</h2>
+<table>
+<tr><th>Metric</th><th>Formula</th><th>Meaning</th></tr>
+<tr><td>Accuracy</td><td>correct / total</td><td>Overall fraction right; misleading when classes are imbalanced</td></tr>
+<tr><td>Precision</td><td>TP / (TP + FP)</td><td>Of items predicted as class X, how many really are X</td></tr>
+<tr><td>Recall</td><td>TP / (TP + FN)</td><td>Of real X items, how many the model found</td></tr>
+<tr><td>F1-score</td><td>2PR / (P + R)</td><td>Harmonic mean; high only when both P and R are high</td></tr>
+<tr><td>Macro average</td><td>Plain mean over the 6 classes</td><td>Every class counts equally (fair to small 'trash')</td></tr>
+<tr><td>Weighted average</td><td>Mean weighted by class size</td><td>Dominated by big classes</td></tr>
+<tr><td>Confusion matrix</td><td>Rows = actual, columns = predicted</td><td>The diagonal is correct; off-diagonal cells show which classes get mixed up</td></tr>
+</table>
+<h3>Worked example — class "trash" (be ready to do this on the board)</h3>
+<ul>
+  <li>TP = 16 (trash predicted as trash). FN = 4 (3 → paper, 1 → plastic). FP = 1 (one paper item predicted as trash).</li>
+  <li>Precision = 16 / (16 + 1) = <b>0.941</b> · Recall = 16 / (16 + 4) = <b>0.800</b></li>
+  <li>F1 = 2 × 0.941 × 0.800 / (0.941 + 0.800) = <b>0.865</b></li>
+  <li>Accuracy = diagonal sum / total = (53+70+57+86+63+16) / 380 = 345 / 380 = <b>0.908</b></li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="results">10. Results &amp; analysis</h2>
+<table class="mono">
+<tr><th>Class</th><th class="c">Precision</th><th class="c">Recall</th><th class="c">F1</th><th class="c">Support</th></tr>
+<tr><td>cardboard</td><td class="c">0.981</td><td class="c">0.883</td><td class="c">0.930</td><td class="c">60</td></tr>
+<tr><td>glass</td><td class="c">0.886</td><td class="c">0.921</td><td class="c">0.903</td><td class="c">76</td></tr>
+<tr><td>metal</td><td class="c">0.864</td><td class="c">0.919</td><td class="c">0.891</td><td class="c">62</td></tr>
+<tr><td>paper</td><td class="c">0.896</td><td class="c">0.966</td><td class="c">0.930</td><td class="c">89</td></tr>
+<tr><td>plastic</td><td class="c">0.926</td><td class="c">0.863</td><td class="c">0.894</td><td class="c">73</td></tr>
+<tr><td>trash</td><td class="c">0.941</td><td class="c">0.800</td><td class="c">0.865</td><td class="c">20</td></tr>
+<tr><td><b>macro avg</b></td><td class="c">0.916</td><td class="c">0.892</td><td class="c">0.902</td><td class="c">380</td></tr>
+</table>
+<figure><img src="assets/viva/confusion_matrix.png" alt="Confusion matrix on the test set" style="max-width:460px"><figcaption>Test confusion matrix (rows = actual, columns = predicted).</figcaption></figure>
+<div class="two">
+<div>
+<h3 class="sub">Strengths</h3>
+<ul>
+  <li>Paper (recall 96.6%) and cardboard (precision 98.1%) are best: their flat, fibrous texture is distinctive.</li>
+  <li>Precision is ≥ 0.864 for every class: when the model names a class, it is usually right.</li>
+  <li>Test accuracy (90.8%) is close to the best validation accuracy (92.6%) → it generalizes.</li>
+</ul>
+</div>
+<div>
+<h3 class="sub">Errors</h3>
+<ul>
+  <li><b>Plastic</b> → metal (5) and glass (4): shiny or transparent bottles reflect light alike.</li>
+  <li><b>Metal → glass</b> (4), <b>glass → plastic</b> (4): the same reflective-surface problem.</li>
+  <li><b>Cardboard → paper</b> (5): thin, light cardboard looks like paper.</li>
+  <li><b>Trash</b> recall only 80%: 137 images, a mixed category with no single look.</li>
+</ul>
+</div>
+</div>
+<h3>Limitations</h3>
+<ul>
+  <li>Only one object on a white background → accuracy will drop on cluttered real-world photos.</li>
+  <li>No organic/food-waste class (the project brief mentions it; TrashNet doesn't have it).</li>
+  <li>Small, imbalanced dataset; one item per image (no detection of several items).</li>
+</ul>
+<h3>Future scope</h3>
+<ul>
+  <li>Bigger, real-scene data (e.g. TACO litter dataset); add an organic class.</li>
+  <li>Class-weighted loss or oversampling for 'trash'.</li>
+  <li>Object detection (YOLO) for several items per photo.</li>
+  <li>Deploy a lighter model (MobileNet, quantized) on a Raspberry Pi in a smart bin, or in a phone app.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="demo">11. Demonstration</h2>
+<pre>activate ai-ml
+cd D:\files\stud\fuzzy\miniproject
+python predict.py path\to\photo1.jpg path\to\photo2.jpg</pre>
+<p>Prints the top-3 classes with confidence and saves <code>outputs/&lt;name&gt;_pred.png</code>. Model file: <code>outputs/waste_resnet18.pt</code> (PyTorch state dict + class names, the epoch-8 checkpoint).</p>
+<pre>ckpt = torch.load(OUT / "waste_resnet18.pt", map_location="cpu", weights_only=True)
+model = build_model(len(ckpt["classes"]))        # same architecture as training
+model.load_state_dict(ckpt["state"]); model.eval()  # load weights, switch off dropout
+probs = torch.softmax(model(eval_tf(img).unsqueeze(0)), 1)[0]   # unsqueeze: add batch dim
+top = probs.topk(3)                               # 3 most likely classes</pre>
+<div class="tip">For a live demo, photograph one item on a plain light background (a sheet of paper works). That matches the training data. A cluttered desk photo may be misclassified, and you can explain why (see limitations).</div>
+<figure><img src="assets/viva/sample_predictions.png" alt="Random test images with true and predicted labels"><figcaption>Random test images: green = correct, red = wrong.</figcaption></figure>
+
+<!-- ============================================================ -->
+<h2 id="code">12. Code walkthrough — <code>train.py</code> in order</h2>
+<table>
+<tr><th>Part</th><th>What it does</th></tr>
+<tr><td><code>EPOCHS, BATCH, LR, SEED</code></td><td>Hyperparameters: 15, 32, 1e-3 (used as 1e-4), 42</td></tr>
+<tr><td><code>train_tf</code> / <code>eval_tf</code></td><td>Preprocessing pipelines: augmentation for training; plain resize + normalize for evaluation</td></tr>
+<tr><td><code>split_data()</code></td><td>Reads folders with <code>ImageFolder</code>, makes the stratified 70/15/15 split, wraps each part with its transform via <code>Subset</code></td></tr>
+<tr><td><code>build_model()</code></td><td>Pre-trained ResNet18 with a new 6-class head</td></tr>
+<tr><td><code>run_epoch()</code></td><td>One pass over a loader. Trains if given an optimizer, else evaluates. Returns loss, accuracy, labels, predictions</td></tr>
+<tr><td><code>main()</code> — setup</td><td>Seeds for reproducibility, GPU if available, <code>DataLoader</code>s (shuffle only the train set), model, loss, Adam, cosine scheduler</td></tr>
+<tr><td><code>main()</code> — loop</td><td>Each epoch: train, validate, step the scheduler, log, save the checkpoint if val accuracy improved</td></tr>
+<tr><td><code>main()</code> — test</td><td>Reloads the best checkpoint, evaluates the test set once, writes <code>test_report.txt</code> (sklearn <code>classification_report</code>)</td></tr>
+<tr><td><code>main()</code> — plots</td><td>Training curves, confusion matrix (seaborn heatmap), 12 sample predictions</td></tr>
+</table>
+<pre>for ep in range(1, EPOCHS + 1):
+    tl, ta, _, _ = run_epoch(model, train_dl, loss_fn, device, opt)   # train
+    vl, va, _, _ = run_epoch(model, val_dl, loss_fn, device)          # validate
+    sched.step()                                                      # lower LR (cosine)
+    if va > best:                                                     # best so far?
+        best = va
+        torch.save({"state": model.state_dict(), "classes": classes}, OUT / "waste_resnet18.pt")</pre>
+<p><code>state_dict()</code> = a dictionary of all weight tensors. We save the weights, not the whole Python object, which is the recommended PyTorch practice.</p>
+<pre>dl = lambda ds, sh: DataLoader(ds, BATCH, shuffle=sh, num_workers=0, pin_memory=True)</pre>
+<p><code>DataLoader</code> makes batches of 32. <code>shuffle=True</code> for training only, so batches differ each epoch. <code>num_workers=0</code> loads data in the main process (worker processes hung on Windows).</p>
+
+<!-- ============================================================ -->
+<h2 id="syllabus">13. Link to the syllabus (Unit 3)</h2>
+<table>
+<tr><th>Course concept</th><th>Where it appears in the project</th></tr>
+<tr><td>Artificial neuron: y = f(Σ w<sub>i</sub>x<sub>i</sub> + b)</td><td>Every conv filter and the final Linear layer compute weighted sums plus bias</td></tr>
+<tr><td>Activation functions</td><td>ReLU in hidden layers, softmax at the output</td></tr>
+<tr><td>Delta rule / gradient descent</td><td>Backpropagation + Adam is the multi-layer generalization: w ← w − η ∂L/∂w</td></tr>
+<tr><td>Learning rate (hyperparameter)</td><td>η = 0.0001 with a cosine schedule</td></tr>
+<tr><td>Cost function</td><td>Cross-entropy loss</td></tr>
+<tr><td>Supervised learning</td><td>Labelled images; the error between prediction and label drives learning</td></tr>
+<tr><td>Fuzzy logic (Unit 2)</td><td>Softmax outputs are like degrees of membership in each class (e.g. metal 0.976, glass 0.024). The model is not a fuzzy system, but the output reads as graded belief, not crisp yes/no</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="qa">14. Likely viva questions</h2>
+
+<h3>Basics</h3>
+<p><b>Q1. Why did you choose this project?</b></p>
+<div class="ans">It's a real environmental problem with a clear use (smart bins, recycling plants). A clean public dataset exists, and it shows the full deep-learning pipeline in one project: data, preprocessing, CNN, training, evaluation, demo.</div>
+<p><b>Q2. What is a CNN, and why use it for images?</b></p>
+<div class="ans">A network with convolution layers that slide shared filters over the image. They detect local patterns anywhere in the image with few parameters, and stacking them builds features from edges up to object parts. A dense network would need millions of weights per layer and would ignore spatial structure.</div>
+<p><b>Q3. What is transfer learning? Why not train from scratch?</b></p>
+<div class="ans">Reusing weights learned on ImageNet and fine-tuning them on our data. With only 2,527 images, an 11M-parameter network trained from scratch would overfit and reach much lower accuracy. Pre-trained low-level features (edges, textures) transfer to any images.</div>
+<p><b>Q4. Why ResNet18 and not VGG or ResNet50?</b></p>
+<div class="ans">ResNet18 is small (11M parameters vs 138M for VGG16), fast to train on a laptop GPU, and its residual connections train stably. A larger model would gain little on a 2.5k-image dataset and overfit more.</div>
+<p><b>Q5. What is a residual (skip) connection?</b></p>
+<div class="ans">The block outputs F(x) + x: the input is added back to the block's output. It learns only the change needed, and gradients can flow straight back through the skip path. This solves the vanishing-gradient / degradation problem of very deep networks.</div>
+
+<h3>Data</h3>
+<p><b>Q6. Why split into train, validation and test?</b></p>
+<div class="ans">Train learns the weights. Validation picks the best epoch. Test is touched once for an unbiased final score. If we chose the model using the test set, the test score would be optimistically biased.</div>
+<p><b>Q7. What is stratified splitting?</b></p>
+<div class="ans">Splitting so every subset keeps the same class proportions as the full data. This matters because trash is only 5.4%; a random split could leave very few trash images in the test set.</div>
+<p><b>Q8. Why normalize with ImageNet mean and std?</b></p>
+<div class="ans">The pre-trained weights were learned on inputs normalized that way. Feeding differently scaled pixels would shift every activation and waste the pre-training.</div>
+<p><b>Q9. What does augmentation do, and why only on training data?</b></p>
+<div class="ans">Random crops, flips, rotations and colour changes create new versions of each image every epoch, so the model learns the object rather than exact pixels, which reduces overfitting. Test data must stay unchanged to give a fair, repeatable score.</div>
+
+<h3>Training</h3>
+<p><b>Q10. What loss and optimizer did you use?</b></p>
+<div class="ans">Cross-entropy loss, the standard for multi-class classification: −log of the probability given to the true class. Adam optimizer, lr 1e-4, which adapts the step size for each weight using running averages of gradients and squared gradients.</div>
+<p><b>Q11. What is an epoch? A batch?</b></p>
+<div class="ans">An epoch is one full pass over all 1,768 training images. A batch is the 32 images processed before one weight update, so one epoch = 56 updates and 15 epochs = 840 updates.</div>
+<p><b>Q12. What is backpropagation?</b></p>
+<div class="ans">The algorithm that computes the gradient of the loss with respect to every weight, by applying the chain rule backwards from the output layer to the input. The optimizer then updates the weights in the direction that reduces the loss. It generalizes the delta rule to multi-layer networks.</div>
+<p><b>Q13. Is your model overfitting?</b></p>
+<div class="ans">Mildly: training accuracy 99.5% vs validation ~91.6%. But validation accuracy rose until epoch 8 and then held at 90–92% instead of falling, and test accuracy (90.8%) matches validation. We controlled it with augmentation, dropout, a small LR and best-checkpoint selection.</div>
+<p><b>Q14. Why save the best epoch instead of the last?</b></p>
+<div class="ans">Later epochs can overfit. Keeping the checkpoint with the highest validation accuracy (epoch 8, 92.6%) works like early stopping.</div>
+<p><b>Q15. What is dropout?</b></p>
+<div class="ans">During training it randomly sets 30% of the 512 features to zero for each image, so the classifier can't depend on a few features. At test time all features are used. It's a regularization technique.</div>
+
+<h3>Results</h3>
+<p><b>Q16. Accuracy is 90.8%, so why also report F1?</b></p>
+<div class="ans">The classes are imbalanced. A model could ignore trash and still score high accuracy. Per-class precision, recall and F1, especially the macro average (0.902), show that every class, including small ones, is handled well.</div>
+<p><b>Q17. Which classes are confused, and why?</b></p>
+<div class="ans">Plastic with metal and glass (shiny or transparent surfaces), metal with glass, and cardboard with paper (similar texture and colour). Trash has the lowest recall (80%) because it has the fewest images and no consistent look.</div>
+<p><b>Q18. Precision vs recall: which matters more here?</b></p>
+<div class="ans">For a recycling plant, high precision for recyclables avoids contaminating a recycling stream with wrong material. High recall for trash avoids letting non-recyclable items through. Both matter, which is why F1 is the summary metric.</div>
+<p><b>Q19. How would you improve it?</b></p>
+<div class="ans">More, real-scene data; a class-weighted loss for trash; an organic class; a stronger backbone (EfficientNet); detection (YOLO) for multiple items; and deployment on an edge device.</div>
+<p><b>Q20. Will it work on any photo of garbage?</b></p>
+<div class="ans">Best on a single item on a plain background, like the training data. On cluttered scenes or several items, accuracy will drop, because the model never saw such images (domain shift). That's the main limitation.</div>
+
+<h3>Tricky ones</h3>
+<p><b>Q21. Where is the fuzzy logic in this project?</b></p>
+<div class="ans">The project is from the neural-network half of the course: it's a CNN. The link to fuzzy logic: softmax outputs are graded degrees of belief (e.g. 97.6% metal, 2.4% glass), like membership values, not a crisp yes/no. A fuzzy extension could be a fuzzy rule-based decision layer, e.g. "if confidence is LOW, send to manual sorting".</div>
+<p><b>Q22. Why no LSTM?</b></p>
+<div class="ans">LSTMs model sequences over time. Each input here is one still image, so there is no sequence. The project brief for topic 4 asks for a CNN only.</div>
+<p><b>Q23. What does <code>model.eval()</code> do?</b></p>
+<div class="ans">It switches the model to evaluation mode: dropout is turned off, and batch normalization uses the running mean and variance saved during training instead of the current batch's statistics. Without it, predictions are random and inconsistent.</div>
+<p><b>Q24. What is <code>torch.no_grad()</code> for?</b></p>
+<div class="ans">It skips gradient tracking during inference, which saves memory and time. Gradients are only needed for training.</div>
+<p><b>Q25. What is <code>unsqueeze(0)</code> in <code>predict.py</code>?</b></p>
+<div class="ans">The model expects a batch of shape [N, 3, 224, 224]. A single image is [3, 224, 224], so <code>unsqueeze(0)</code> adds the batch dimension → [1, 3, 224, 224].</div>
+<p><b>Q26. Why GPU?</b></p>
+<div class="ans">Convolutions are millions of independent multiply-adds; a GPU runs them in parallel. Training took minutes on the RTX 4060; a CPU would take far longer. Prediction runs fine on the CPU.</div>
+
+<!-- ============================================================ -->
+<h2 id="nums">15. Numbers to remember</h2>
+<table class="mono">
+<tr><th>What</th><th class="c">Value</th></tr>
+<tr><td>Images / classes</td><td class="c">2,527 / 6</td></tr>
+<tr><td>Train / val / test</td><td class="c">1768 / 379 / 380</td></tr>
+<tr><td>Input size</td><td class="c">224 × 224 × 3</td></tr>
+<tr><td>Parameters</td><td class="c">≈ 11.18 M</td></tr>
+<tr><td>Learning rate / batch / epochs</td><td class="c">1e-4 / 32 / 15</td></tr>
+<tr><td>Dropout</td><td class="c">0.3</td></tr>
+<tr><td>Epoch 1 val accuracy</td><td class="c">82.3%</td></tr>
+<tr><td>Best val accuracy (epoch 8)</td><td class="c">92.6%</td></tr>
+<tr><td>Final train accuracy</td><td class="c">99.5%</td></tr>
+<tr><td>Test accuracy</td><td class="c">90.8% (345/380)</td></tr>
+<tr><td>Macro P / R / F1</td><td class="c">0.916 / 0.892 / 0.902</td></tr>
+<tr><td>Best class / worst class (F1)</td><td class="c">paper, cardboard 0.930 / trash 0.865</td></tr>
+</table>
+
+<footer>Prints cleanly on A4 (Ctrl+P). Night before: read sections 1, 2, 10, 14 and 15.</footer>
+</main>
+</body>
+</html>
