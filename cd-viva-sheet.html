@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Project Viva Sheet — Compiler Design (CFG Builder)</title>
+<link rel="stylesheet" href="assets/fuzzy-notes.css">
+</head>
+<body>
+<main>
+<header class="unit">
+  <div class="kicker">Compiler Design · CSN401 · Semester Project Viva</div>
+  <h1>Control Flow Graph (CFG) Builder — viva sheet</h1>
+  <p class="src">Project 9. Code: <code>tac.l</code>, <code>cfg.c</code>, <code>cfg.h</code>, <code>gui.c</code>, <code>test_cfg.c</code> in <code>D:\files\stud\compiler\project-cfg-builder</code>. Every output on this sheet was produced by the actual program. Back: <a href="index.html">Interview Prep</a></p>
+</header>
+
+<nav class="toc"><b>Contents</b>
+<ol>
+  <li><a href="#pitch">30-second pitch</a></li>
+  <li><a href="#glance">Project at a glance</a></li>
+  <li><a href="#where">Where a CFG fits in a compiler</a></li>
+  <li><a href="#tac">Input: three-address code</a></li>
+  <li><a href="#lex">Lexical analysis with lex (tac.l)</a></li>
+  <li><a href="#stmts">Tokens → statements</a></li>
+  <li><a href="#leaders">Leaders and basic blocks</a></li>
+  <li><a href="#edges">Edges</a></li>
+  <li><a href="#reach">Reachability (dead code)</a></li>
+  <li><a href="#dom">Dominators</a></li>
+  <li><a href="#loops">Back edges and natural loops</a></li>
+  <li><a href="#worked">Worked example: nested loop</a></li>
+  <li><a href="#errors">Error handling</a></li>
+  <li><a href="#out">Outputs: report, GUI, .dot</a></li>
+  <li><a href="#code">Code walkthrough</a></li>
+  <li><a href="#test">Testing</a></li>
+  <li><a href="#syllabus">Link to the syllabus</a></li>
+  <li><a href="#beyond">Beyond the syllabus</a></li>
+  <li><a href="#qa">Likely viva questions</a></li>
+  <li><a href="#nums">Numbers to remember</a></li>
+</ol></nav>
+
+<!-- ============================================================ -->
+<h2 id="pitch">1. 30-second pitch</h2>
+<div class="def"><b>Say this first:</b> "Our project takes a program in three-address code and builds its control flow graph. A lex scanner, written in <code>tac.l</code>, splits the code into tokens. Our C code then finds the <b>leaders</b>, splits the program into <b>basic blocks</b>, and joins them with edges for jumps and fall-through. On that graph it computes <b>dominators</b>, finds <b>back edges</b> and <b>natural loops</b>, and flags <b>unreachable code</b>. A Windows GUI draws the graph, prints a full report, and can export it as a Graphviz file. This is the loop-detection step from Unit 5 that code optimization is built on."</div>
+<div class="tip">Then stop and let the examiner choose a direction. The two most common follow-ups are "what is a leader?" and "how do you detect a loop?". Sections 7 and 11 answer both.</div>
+
+<!-- ============================================================ -->
+<h2 id="glance">2. Project at a glance</h2>
+<table>
+<tr><th>Item</th><th>Value</th></tr>
+<tr><td>Project</td><td>No. 9: Control Flow Graph (CFG) Builder. Platform: C</td></tr>
+<tr><td>Objective</td><td>Build a structural representation of how control flows within a program, as a stepping stone to compiler optimization</td></tr>
+<tr><td>Input</td><td>Three-address code (TAC), typed into the input box or opened from a <code>.tac</code> file</td></tr>
+<tr><td>Output</td><td>Leaders, basic blocks, labelled edges, dominator sets, natural loops, unreachable blocks, the drawn graph, a Graphviz <code>.dot</code> file</td></tr>
+<tr><td>Lexer</td><td><code>tac.l</code>, compiled by flex into <code>lex.yy.c</code></td></tr>
+<tr><td>CFG logic</td><td><code>cfg.c</code> (≈335 lines) and <code>cfg.h</code> (types)</td></tr>
+<tr><td>GUI</td><td><code>gui.c</code>: Win32 API window, graph drawn with GDI</td></tr>
+<tr><td>Tests</td><td><code>test_cfg.c</code>: 22 assert-based test functions on 5 samples and the error cases</td></tr>
+<tr><td>Tools</td><td>flex 2.6.4, MinGW-w64 gcc 16.2, Windows 11</td></tr>
+<tr><td>Limits</td><td>500 statements, 255 characters per line, 31 characters per label</td></tr>
+</table>
+
+<h3>Pipeline</h3>
+<ol class="steps">
+  <li><b>Lexical analysis</b>: <code>yylex()</code> from <code>tac.l</code> returns tokens (label, keyword, word, operator, space, newline).</li>
+  <li><b>Statements</b>: <code>cfg_build()</code> groups the tokens of one line into a <code>Stmt</code> and decides its kind: plain, goto, if, ifFalse or return.</li>
+  <li><b>Resolve labels</b>: every jump target is matched to a statement, and duplicate or undefined labels are errors.</li>
+  <li><b>Leaders</b>: mark the first statement of every basic block.</li>
+  <li><b>Basic blocks</b>: each one runs from a leader up to the statement before the next leader.</li>
+  <li><b>Edges</b>: added from the last statement of each block.</li>
+  <li><b>Analysis</b>: reachability by depth-first search, then dominators, back edges and natural loops.</li>
+  <li><b>Output</b>: the text report (<code>cfg_report</code>), the Graphviz file (<code>cfg_dot</code>) and the drawn graph (<code>gui.c</code>).</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="where">3. Where a CFG fits in a compiler</h2>
+<p>Phases of a compiler:</p>
+<pre>source → lexical analysis → syntax analysis → semantic analysis
+       → intermediate code generation (three-address code)
+       → <b>code optimization</b>  ← the CFG is built here
+       → code generation → target code</pre>
+<ul>
+  <li>The optimizer works on intermediate code, not source. It first needs to know <b>which statements always run together</b> (basic blocks) and <b>which block can follow which</b> (edges). That graph is the CFG.</li>
+  <li>Loop optimizations such as code motion, strength reduction and induction-variable elimination need to know <b>where the loops are</b>. The CFG plus dominators answers that.</li>
+  <li>Dead-code elimination needs to know which blocks can <b>never run</b>. That is reachability on the CFG.</li>
+  <li>Our project uses lex (front end) to read TAC (the output of the middle phase) and does the <b>first step of the optimizer</b>.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="tac">4. Input: three-address code</h2>
+<div class="def"><b>Three-address code:</b> an intermediate code where every instruction has at most three addresses (two operands and one result), such as <code>t1 = i * 4</code>. Control flow uses only <code>goto</code> and conditional jumps, so the jumps are explicit. That is what makes it easy to build a CFG from it.</div>
+<table>
+<tr><th>Kind</th><th>Form</th><th>Example</th><th>Ends a block?</th></tr>
+<tr><td>GOTO</td><td><code>goto T</code></td><td><code>goto L2</code></td><td>Yes</td></tr>
+<tr><td>IF</td><td><code>if &lt;cond&gt; goto T</code></td><td><code>if i &gt; 10 goto 6</code></td><td>Yes</td></tr>
+<tr><td>IFFALSE</td><td><code>ifFalse &lt;cond&gt; goto T</code></td><td><code>ifFalse a &lt; b goto L3</code></td><td>Yes</td></tr>
+<tr><td>RETURN</td><td><code>return [x]</code>, <code>halt</code>, <code>exit</code></td><td><code>return t1</code></td><td>Yes</td></tr>
+<tr><td>PLAIN</td><td>anything else</td><td><code>t1 = i * 4</code>, <code>a[t2] = 0</code>, <code>param x</code></td><td>No</td></tr>
+</table>
+<ul>
+  <li>Format: <code>[label:] statement</code>, one per line. A label is a number (<code>3:</code>) or a name (<code>L1:</code>). A label alone on a line belongs to the next statement.</li>
+  <li><code>//</code> and <code>#</code> start comments. Assignments may use <code>=</code> or <code>:=</code>. <code>if(i &gt; 10) goto L2</code> also works without a space.</li>
+  <li><code>ifFalse x goto L</code> jumps when the condition is <b>false</b>. The Dragon Book uses it to translate <code>while</code> and <code>if</code> statements.</li>
+</ul>
+<p>Sample <code>while_loop.tac</code>, which is <code>i = 1; while (i &lt;= 10) { t1 = i*4; i = i+1; }</code> translated to TAC:</p>
+<pre>1: i = 1
+2: if i &gt; 10 goto 6
+3: t1 = i * 4
+4: i = i + 1
+5: goto 2
+6: return</pre>
+
+<!-- ============================================================ -->
+<h2 id="lex">5. Lexical analysis with lex (<code>tac.l</code>)</h2>
+<div class="def"><b>lex / flex:</b> a tool that turns a list of <b>regular expressions + actions</b> into a C scanner. <code>flex tac.l</code> writes <code>lex.yy.c</code>, which contains the function <code>yylex()</code>. Each call returns the next token, and the matched text is in <code>yytext</code>.</div>
+<p>A lex file has three parts separated by <code>%%</code>: <b>definitions</b>, <b>rules</b>, and <b>user code</b>.</p>
+<pre>ID      [A-Za-z_][A-Za-z0-9_]*
+NUM     [0-9]+
+%%
+^[ \t]*({ID}|{NUM})[ \t]*":"/[^=]   { return T_LABEL; }
+"//".*|"#".*                        { /* comment: skip */ }
+"goto"                              { return T_GOTO; }
+"ifFalse"                           { return T_IFFALSE; }
+"if"                                { return T_IF; }
+"return"|"halt"|"exit"              { return T_RETURN; }
+{ID}|{NUM}                          { return T_WORD; }
+[ \t\r]+                            { return T_SPACE; }
+\n                                  { return T_NEWLINE; }
+.                                   { return T_OTHER; }
+%%
+void tac_begin(const char *text) { tac_buf = yy_scan_string(text); }</pre>
+<h3>How lex chooses between rules</h3>
+<ol>
+  <li><b>Longest match wins.</b> For <code>iffy</code>, the <code>{ID}</code> rule matches 4 characters and <code>"if"</code> only 2, so it is a WORD, not the keyword. Same for <code>gotoX</code>, <code>returned</code> and <code>exit_code</code>.</li>
+  <li><b>On a tie, the earlier rule wins.</b> For <code>if</code>, both <code>"if"</code> and <code>{ID}</code> match 2 characters. <code>"if"</code> comes first, so it is the keyword. That is why keyword rules must be written <b>above</b> the identifier rule.</li>
+</ol>
+<h3>Special patterns in the label rule</h3>
+<ul>
+  <li><code>^</code>: matches only at the <b>start of a line</b>, so <code>x = y:z</code> has no label.</li>
+  <li><code>/[^=]</code>: <b>trailing context</b>. The colon must be followed by something other than <code>=</code>. That character is checked but not consumed. So <code>i := 0</code> is an assignment, not a label <code>i</code>.</li>
+  <li><code>.</code> matches any character except newline. It catches operators and brackets: <code>= + * [ ] ( ) &lt; &gt;</code>.</li>
+</ul>
+<h3>Options and helpers</h3>
+<ul>
+  <li><code>%option noyywrap</code>: no <code>yywrap()</code> function is needed, and input ends at end-of-string.</li>
+  <li><code>nounput noinput</code>: drop unused helper functions, which avoids compiler warnings.</li>
+  <li><code>yy_scan_string(text)</code>: makes lex read from a string in memory (the text box), not from a file or <code>yyin</code>.</li>
+</ul>
+<table class="mono">
+<tr><th>Input line</th><th>Tokens returned</th></tr>
+<tr><td>L1: if(i &gt; 10) goto L2</td><td>LABEL IF OTHER( WORD SPACE OTHER&gt; SPACE WORD OTHER) SPACE GOTO SPACE WORD NEWLINE</td></tr>
+<tr><td>i := i + 1</td><td>WORD SPACE OTHER: OTHER= SPACE WORD SPACE OTHER+ SPACE WORD NEWLINE</td></tr>
+<tr><td>iffy = 2</td><td>WORD SPACE OTHER= SPACE WORD NEWLINE</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="stmts">6. Tokens → statements (<code>cfg_build</code>)</h2>
+<p><code>cfg_build()</code> calls <code>yylex()</code> in a loop and collects one line's tokens into a <code>Line</code> buffer:</p>
+<ul>
+  <li><b>T_LABEL</b>: saves the label name as pending. It is attached to the next statement.</li>
+  <li><b>First real token</b>: decides the kind. <code>goto</code> gives GOTO and the next word is the target. <code>if</code> or <code>ifFalse</code> waits for a later <code>goto</code>. <code>return</code>, <code>halt</code> or <code>exit</code> gives RETURN.</li>
+  <li><b>T_GOTO later in an if line</b>: the line becomes IF or IFFALSE, and the next word is the target.</li>
+  <li><b>T_SPACE</b>: adds one space, so the stored text has squeezed white space.</li>
+  <li><b>T_NEWLINE or end of input</b>: if the line has text, it becomes a statement <code>s[ns++]</code>.</li>
+</ul>
+<pre>} else if (L.ntok == 0) {           /* first token decides the statement kind */
+    if (tok == T_GOTO) { L.kind = K_GOTO; L.want_target = 1; }
+    else if (tok == T_IF) L.cond = K_IF;
+    else if (tok == T_IFFALSE) L.cond = K_IFFALSE;
+    else if (tok == T_RETURN) L.kind = K_RETURN;
+} else if (tok == T_GOTO &amp;&amp; L.cond &amp;&amp; L.kind == K_PLAIN) {
+    L.kind = L.cond; L.want_target = 1; /* "if &lt;cond&gt; goto T" */
+}</pre>
+<p>Then <b>label resolution</b>: each target such as <code>"L2"</code> is looked up in the labels and turned into a statement index, <code>target_idx</code>. Labels defined twice, and targets that don't exist, are errors.</p>
+
+<!-- ============================================================ -->
+<h2 id="leaders">7. Leaders and basic blocks</h2>
+<div class="def"><b>Basic block:</b> a maximal sequence of statements where control enters only at the first statement and leaves only at the last. There are no jumps into the middle and no jumps out of the middle. If the first statement runs, all of them run.</div>
+<h3>Leader rules (Dragon Book Algorithm 8.5)</h3>
+<ol>
+  <li>The <b>first statement</b> is a leader.</li>
+  <li>Any statement that is the <b>target of a jump</b> (goto, if, ifFalse) is a leader.</li>
+  <li>Any statement that <b>immediately follows a jump or return</b> is a leader.</li>
+</ol>
+<p>A basic block = a leader plus everything up to, but not including, the next leader.</p>
+<pre>/* leaders */
+g-&gt;s[0].leader_why |= LEAD_FIRST;                                  /* rule 1 */
+for (i = 0; i &lt; g-&gt;ns; i++) {
+    if (g-&gt;s[i].kind == K_PLAIN) continue;
+    if (g-&gt;s[i].target_idx &gt;= 0)
+        g-&gt;s[g-&gt;s[i].target_idx].leader_why |= LEAD_TARGET;        /* rule 2 */
+    if (i + 1 &lt; g-&gt;ns) g-&gt;s[i + 1].leader_why |= LEAD_AFTER_JUMP;  /* rule 3 */
+}
+/* blocks: a new block starts at every leader */
+for (i = 0; i &lt; g-&gt;ns; i++) {
+    if (g-&gt;s[i].leader_why) {
+        if (g-&gt;nb) g-&gt;b[g-&gt;nb - 1].last = i - 1;   /* close previous block */
+        g-&gt;b[g-&gt;nb++].first = i;                   /* open new block */
+    }
+    g-&gt;blk_of[i] = g-&gt;nb - 1;                      /* statement → block */
+}</pre>
+<p><code>leader_why</code> is a <b>bit flag</b> (1 = first, 2 = target, 4 = after jump). One statement can have several reasons, and the <code>|=</code> keeps them all. The report prints them all, e.g. "S6 jump target, after jump".</p>
+<h3>On <code>while_loop.tac</code></h3>
+<table class="mono">
+<tr><th>Stmt</th><th>Text</th><th>Leader?</th><th>Why</th><th>Block</th></tr>
+<tr><td>S1</td><td>i = 1</td><td class="c">yes</td><td>first statement</td><td>B1</td></tr>
+<tr><td>S2</td><td>if i &gt; 10 goto 6</td><td class="c">yes</td><td>target of goto 2</td><td>B2</td></tr>
+<tr><td>S3</td><td>t1 = i * 4</td><td class="c">yes</td><td>after the jump in S2</td><td>B3</td></tr>
+<tr><td>S4</td><td>i = i + 1</td><td class="c">no</td><td></td><td>B3</td></tr>
+<tr><td>S5</td><td>goto 2</td><td class="c">no</td><td></td><td>B3</td></tr>
+<tr><td>S6</td><td>return</td><td class="c">yes</td><td>target of S2 + after goto S5</td><td>B4</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="edges">8. Edges</h2>
+<p>Edges are decided only by the <b>last statement</b> of each block:</p>
+<table>
+<tr><th>Last statement</th><th>Edges</th><th>Label</th></tr>
+<tr><td><code>goto T</code></td><td>→ block of T</td><td>jump</td></tr>
+<tr><td><code>if c goto T</code></td><td>→ block of T, → next block</td><td>true, false</td></tr>
+<tr><td><code>ifFalse c goto T</code></td><td>→ block of T, → next block</td><td>false, true (swapped)</td></tr>
+<tr><td><code>return</code> / <code>halt</code> / <code>exit</code></td><td>→ EXIT</td><td>none</td></tr>
+<tr><td>anything else</td><td>→ next block (EXIT if it is the last block)</td><td>fall-through</td></tr>
+</table>
+<ul>
+  <li><b>ENTRY</b> and <b>EXIT</b> are extra nodes. ENTRY → B1 always exists. Every return goes to EXIT.</li>
+  <li>If a conditional's target <b>is</b> the next block, both edges go to the same place, so we store <b>one</b> edge labelled <code>true/false</code>.</li>
+  <li>Each block has at most <b>2 successors</b> (<code>Edge succ[2]</code>). For a conditional, <code>succ[0]</code> is the jump target and <code>succ[1]</code> is the next block.</li>
+</ul>
+<pre>switch (s-&gt;kind) {
+case K_GOTO:   e[0].to = t;        e[0].label = "jump";  b-&gt;nsucc = 1; break;
+case K_RETURN: e[0].to = BLK_EXIT; e[0].label = NULL;    b-&gt;nsucc = 1; break;
+case K_PLAIN:  e[0].to = nxt;      e[0].label = "fall-through"; b-&gt;nsucc = 1; break;
+default:       /* IF / IFFALSE */
+    if (t == nxt) { e[0].to = t; e[0].label = "true/false"; b-&gt;nsucc = 1; }
+    else { e[0].to = t;   e[0].label = tl;    /* jump taken    */
+           e[1].to = nxt; e[1].label = fl;    /* falls through */
+           b-&gt;nsucc = 2; }
+}</pre>
+<figure><img src="assets/cd-viva/while_loop.png" alt="CFG Builder window showing while_loop.tac: ENTRY, B1, B2 with a bold border, B3 with a red back edge to B2, B4, EXIT"><figcaption>while_loop.tac in the program. The red arrow on the left is the back edge B3 → B2. B2 has a thick border because it is a loop header.</figcaption></figure>
+
+<!-- ============================================================ -->
+<h2 id="reach">9. Reachability (unreachable / dead code)</h2>
+<ul>
+  <li>A <b>depth-first search</b> from B1 with an explicit stack marks every block that can be reached.</li>
+  <li>Unmarked blocks can never run. That is <b>dead code</b>, which an optimizer would delete.</li>
+  <li><code>unreachable.tac</code>: <code>2: goto 5</code> jumps over S3–S4, so B2 = {S3, S4} is unreachable. It is drawn grey and dashed and listed in the report.</li>
+  <li>Unreachable blocks are left out of the dominator and loop calculations.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="dom">10. Dominators</h2>
+<div class="def"><b>Dominator:</b> block D <b>dominates</b> block B if <b>every</b> path from the entry to B goes through D. Every block dominates itself, and B1 dominates every reachable block.</div>
+<span class="eq">Dom(B1) = {B1}  ·  Dom(B) = {B} ∪ ⋂<sub>P ∈ pred(B)</sub> Dom(P)</span>
+<p><b>Iterative algorithm</b> (Dragon Book §9.6.1):</p>
+<ol class="steps">
+  <li>Set Dom(B1) = {B1}, and set every other reachable block's Dom to <b>all blocks</b>.</li>
+  <li>For each block B ≠ B1: intersect Dom(P) over all predecessors P, then add B itself.</li>
+  <li>Repeat until no set changes (a fixed point).</li>
+</ol>
+<pre>do {
+    changed = 0;
+    for (i = 1; i &lt; n; i++) {                  /* every block except B1 */
+        unsigned char nd[MAX_STMTS];
+        if (!g-&gt;b[i].reachable) continue;
+        memset(nd, 1, n);                       /* start with "all blocks" */
+        for (j = 0; j &lt; n; j++)
+            if (is_pred(g, j, i))               /* j → i is an edge */
+                for (k = 0; k &lt; n; k++) nd[k] &amp;= g-&gt;dom[j][k];   /* intersect */
+        nd[i] = 1;                              /* ∪ {B} */
+        if (memcmp(nd, g-&gt;dom[i], n)) { memcpy(g-&gt;dom[i], nd, n); changed = 1; }
+    }
+} while (changed);</pre>
+<p>A set is stored as a row of bytes: <code>dom[b][d] = 1</code> means d dominates b. Intersection is then <code>&amp;=</code> on each byte. It is O(n³) per pass, which is fine for 500 blocks.</p>
+
+<!-- ============================================================ -->
+<h2 id="loops">11. Back edges and natural loops</h2>
+<div class="def"><b>Back edge:</b> an edge B → H where <b>H dominates B</b>. The edge goes back to a block that must already have run, which is what a loop looks like.<br><b>Natural loop</b> of B → H: H plus every block that can reach B <b>without passing through H</b>. H is the <b>loop header</b>, the only way into the loop.</div>
+<p><b>Finding the loop body</b> (Dragon Book Algorithm 9.46): start with {H, B}. Push B, and keep adding predecessors of anything in the loop. Never go past H.</p>
+<pre>if (h == BLK_EXIT || !g-&gt;dom[i][h]) continue;   /* not a back edge */
+e-&gt;back = 1;
+L = g-&gt;nloops++;
+g-&gt;in_loop[L][h] = 1;                            /* header is in the loop */
+if (!g-&gt;in_loop[L][i]) { g-&gt;in_loop[L][i] = 1; stack[top++] = i; }
+while (top) {                                    /* walk predecessors backwards */
+    int x = stack[--top];
+    for (k = 0; k &lt; n; k++)
+        if (!g-&gt;in_loop[L][k] &amp;&amp; is_pred(g, k, x)) {
+            g-&gt;in_loop[L][k] = 1; stack[top++] = k;
+        }
+}</pre>
+<p>Since H is marked in the loop before the walk starts, the walk stops at H. Blocks before the loop are never added.</p>
+<div class="tip">"Why not just call any edge that goes upward a loop?" Because a goto can jump backwards without making a real loop. Dominance guarantees the header runs before the body and is the only way in, which is the property loop optimizations rely on.</div>
+
+<!-- ============================================================ -->
+<h2 id="worked">12. Worked example: <code>nested_loop.tac</code></h2>
+<div class="two">
+<pre>     i = 0
+L1:  ifFalse i &lt; n goto L4
+     j = 0
+L2:  ifFalse j &lt; m goto L3
+     t1 = i * m
+     t2 = t1 + j
+     a[t2] = 0
+     j = j + 1
+     goto L2
+L3:  i = i + 1
+     goto L1
+L4:  return</pre>
+<div>
+<p>Source:<br><code>for (i=0; i&lt;n; i++)<br>&nbsp;&nbsp;for (j=0; j&lt;m; j++)<br>&nbsp;&nbsp;&nbsp;&nbsp;a[i][j] = 0;</code></p>
+<p><b>Leaders:</b> S1 (first), S2 (L1 target), S3 (after jump), S4 (L2 target), S5 (after jump), S10 (L3 target + after goto), S12 (L4 target + after goto).</p>
+</div>
+</div>
+<table class="mono">
+<tr><th>Block</th><th>Statements</th><th>Edges out</th><th>Dom</th></tr>
+<tr><td>B1</td><td>S1</td><td>→B2 fall-through</td><td>{B1}</td></tr>
+<tr><td>B2</td><td>S2</td><td>→B7 false, →B3 true</td><td>{B1,B2}</td></tr>
+<tr><td>B3</td><td>S3</td><td>→B4 fall-through</td><td>{B1,B2,B3}</td></tr>
+<tr><td>B4</td><td>S4</td><td>→B6 false, →B5 true</td><td>{B1,B2,B3,B4}</td></tr>
+<tr><td>B5</td><td>S5–S9</td><td>→B4 jump <b>[back]</b></td><td>{B1,B2,B3,B4,B5}</td></tr>
+<tr><td>B6</td><td>S10–S11</td><td>→B2 jump <b>[back]</b></td><td>{B1,B2,B3,B4,B6}</td></tr>
+<tr><td>B7</td><td>S12</td><td>→EXIT</td><td>{B1,B2,B7}</td></tr>
+</table>
+<ul>
+  <li><b>B5 → B4</b> is a back edge because B4 ∈ Dom(B5). <b>Loop 1</b>: header B4, body {B4, B5}. This is the inner <code>j</code> loop.</li>
+  <li><b>B6 → B2</b> is a back edge because B2 ∈ Dom(B6). <b>Loop 2</b>: header B2, body {B2, B3, B4, B5, B6}. This is the outer <code>i</code> loop, and it contains loop 1.</li>
+  <li>B6 is not dominated by B5: the path B4 → B6 skips B5. That's why Dom(B6) has no B5.</li>
+  <li>Optimization view: <code>t1 = i * m</code> doesn't change inside the inner loop, so it could be moved out to B3 (loop-invariant code motion).</li>
+</ul>
+<figure><img src="assets/cd-viva/nested_loop.png" alt="CFG Builder window showing nested_loop.tac with two red back edges in separate lanes: B5 to B4 and B6 to B2"><figcaption>nested_loop.tac: two red back edges, inner (B5 → B4) and outer (B6 → B2). False edges are routed on the right.</figcaption></figure>
+
+<!-- ============================================================ -->
+<h2 id="errors">13. Error handling</h2>
+<p>Errors are <b>detected</b> while reading the input, and <b>reported</b> with the line number in the status bar and the report box. On error, no graph is drawn and Export is disabled. Processing stops at the first error, so there is no recovery.</p>
+<table class="mono">
+<tr><th>Input</th><th>Message</th></tr>
+<tr><td>goto L9</td><td>Line 1: undefined label 'L9'</td></tr>
+<tr><td>L1: x=1 / L1: y=2</td><td>Line 2: duplicate label 'L1'</td></tr>
+<tr><td>goto</td><td>Line 1: goto without target</td></tr>
+<tr><td>L1: / L2: / x=1</td><td>Line 2: two labels for one statement</td></tr>
+<tr><td>x=1 / L1:</td><td>Line 2: label at end of input with no statement</td></tr>
+<tr><td>(empty)</td><td>empty input</td></tr>
+<tr><td>501 statements</td><td>Line 501: too many statements (max 500)</td></tr>
+<tr><td>a 256-character line</td><td>Line 1: line too long (max 255 chars)</td></tr>
+<tr><td>a 32-character label</td><td>Line 1: label too long (max 31 chars)</td></tr>
+</table>
+<p>Lines it doesn't recognise are <b>not</b> errors. They are treated as plain statements, since anything that isn't a jump or return just falls through. Unit 5 error types: these are <b>lexical / syntactic</b> errors in the TAC. "Undefined label" is a <b>semantic</b> error, because the line is well-formed but refers to something that doesn't exist.</p>
+
+<!-- ============================================================ -->
+<h2 id="out">14. Outputs</h2>
+<ul>
+  <li><b>Text report</b> (<code>cfg_report</code>): sections LEADERS, BASIC BLOCKS, EDGES, DOMINATORS, LOOPS, UNREACHABLE BLOCKS.</li>
+  <li><b>Drawn graph</b> (<code>gui.c</code>):
+    <ul>
+      <li>Boxes are stacked in program order between ENTRY and EXIT.</li>
+      <li>Forward jumps are routed on the right. Back edges are red and on the left.</li>
+      <li>Loop headers have a thick border. Unreachable blocks are grey and dashed.</li>
+      <li>The panel scrolls with the scrollbar or the mouse wheel.</li>
+    </ul></li>
+  <li><b>Graphviz .dot</b> (<code>cfg_dot</code>): plain text such as <code>B3 -&gt; B2 [label="jump", color=red];</code>. <code>dot -Tpng cfg.dot -o cfg.png</code> renders it with automatic layout.</li>
+  <li><b>Status bar</b>: e.g. <code>4 blocks, 6 edges, 1 loops</code>. The edge count includes ENTRY → B1.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="code">15. Code walkthrough</h2>
+<table>
+<tr><th>File</th><th>What it contains</th></tr>
+<tr><td><code>tac.l</code></td><td>The lex specification: token rules, <code>tac_begin()</code> / <code>tac_end()</code> (scan from a string)</td></tr>
+<tr><td><code>lex.yy.c</code></td><td>Generated by <code>flex tac.l</code>. Never edited by hand</td></tr>
+<tr><td><code>cfg.h</code></td><td>Limits, token codes, and the types <code>Stmt</code>, <code>Edge</code>, <code>Block</code>, <code>Cfg</code>, plus the function prototypes</td></tr>
+<tr><td><code>cfg.c</code></td><td><code>cfg_build()</code> (tokens → statements → labels → leaders → blocks → edges), <code>analyze()</code> (reachability, dominators, loops), <code>cfg_report()</code>, <code>cfg_dot()</code></td></tr>
+<tr><td><code>gui.c</code></td><td>Win32 window: input and report boxes, Open .tac / Build CFG / Export .dot buttons, <code>draw_graph()</code> with GDI</td></tr>
+<tr><td><code>test_cfg.c</code></td><td>22 assert tests: parsing, every sample's blocks, edges, dominators and loops, report and DOT text, every error message</td></tr>
+</table>
+<h3>Main data structures (<code>cfg.h</code>)</h3>
+<pre>typedef enum { K_PLAIN, K_GOTO, K_IF, K_IFFALSE, K_RETURN } Kind;
+typedef struct { char label[32]; char text[256]; Kind kind;
+                 char target[32]; int target_idx; int src_line; int leader_why; } Stmt;
+typedef struct { int to; const char *label; int back; } Edge;  /* to: block, or BLK_EXIT = -1 */
+typedef struct { int first, last; Edge succ[2]; int nsucc; int reachable; } Block;
+typedef struct { Stmt s[500]; int ns;  Block b[500]; int nb;  int blk_of[500];
+                 unsigned char dom[500][500];
+                 int loop_head[1000], loop_tail[1000]; int nloops;
+                 unsigned char in_loop[1000][500];  char err[256]; } Cfg;</pre>
+<ul>
+  <li><b>Fixed-size arrays</b>, no <code>malloc</code>, so there are no memory leaks or freeing to manage. <code>Cfg</code> is ~0.9 MB, so it is a <code>static</code> global, not a local (it would overflow the stack).</li>
+  <li><code>loop_head</code> has 1000 entries because each block has at most 2 out-edges, so at most 2 back edges per block.</li>
+  <li><code>blk_of[stmt]</code> maps a statement to its block. The edge code uses it to turn a jump target statement into a target block.</li>
+</ul>
+<h3>Output without buffer overflow</h3>
+<pre>static void append(char *out, size_t n, size_t *len, const char *fmt, ...)</pre>
+<p>Every report and DOT line goes through <code>append()</code>, which uses <code>vsnprintf</code>. If the buffer is full, it writes <code>...</code> at the end and stops, so it can never write past the buffer.</p>
+<h3>Build commands</h3>
+<pre>flex tac.l
+gcc -Wall -O2 gui.c cfg.c lex.yy.c -o cfg_builder.exe -mwindows -lcomdlg32 -lgdi32
+gcc -Wall -O2 test_cfg.c cfg.c lex.yy.c -o test_cfg.exe</pre>
+<p><code>-mwindows</code>: a GUI program, so no console window. <code>-lcomdlg32</code>: the Open/Save dialogs. <code>-lgdi32</code>: drawing.</p>
+
+<!-- ============================================================ -->
+<h2 id="test">16. Testing</h2>
+<ul>
+  <li><code>test_cfg.exe</code> prints <code>all tests passed</code>, or stops at the first failing <code>assert</code> with its line number.</li>
+  <li>Expected results for every sample were <b>worked out by hand</b> first (leaders, blocks, edges, dominators, loops), then written as asserts. This is test-driven: test first, then code.</li>
+  <li>Tricky inputs are tested on purpose:
+    <ul>
+      <li>Windows <code>\r\n</code> line endings.</li>
+      <li>Look-alikes: <code>gotoX</code>, <code>iffy</code>, <code>returned</code>, <code>exit_code</code>, and <code>x = y:z</code>.</li>
+      <li><code>:=</code> and <code>if(</code>.</li>
+      <li>A conditional whose true and false edges reach the same block.</li>
+      <li>Quotes in the DOT output.</li>
+      <li>Exactly 255 vs 256 characters on a line.</li>
+      <li>Every error message.</li>
+    </ul></li>
+  <li>The GUI was checked by building each sample and comparing the drawing with the report. Those runs are the report screenshots.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="syllabus">17. Link to the syllabus</h2>
+<table>
+<tr><th>Syllabus (CSN401 CDD)</th><th>In the project</th></tr>
+<tr><td>Unit 1: lexical analysis, tokens, <b>Flex tool to design a lexical analyser</b>; labs 5, 8, 9 (Lex)</td><td><code>tac.l</code>: regular definitions, rules, longest match, <code>yylex</code>/<code>yytext</code></td></tr>
+<tr><td>Unit 3: <b>three-address code</b>, ICG of if statements, while and for loops, arrays</td><td>The input language. The samples are TAC for if/else, while, nested for, and <code>a[t2]</code></td></tr>
+<tr><td>Unit 5: code optimization, <b>loop detection using control flow analysis</b>, loop optimization</td><td>Basic blocks, CFG, dominators, back edges, natural loops, dead code</td></tr>
+<tr><td>Unit 5: error handling — types, <b>detection, reporting</b></td><td>9 error messages with line numbers</td></tr>
+<tr><td>CO1, CO3, CO4</td><td>Lexical analysis; TAC for control statements; optimization and error handling</td></tr>
+</table>
+<p>Not used: parsers (Unit 2) and symbol tables (Unit 4). The project brief doesn't need them, because the TAC format is line-based and a scanner is enough. The label list does act as a tiny symbol table: name → statement index, with duplicate checks.</p>
+
+<!-- ============================================================ -->
+<h2 id="beyond">18. Beyond the syllabus (be ready to explain)</h2>
+<table>
+<tr><th>Topic</th><th>One-line explanation</th></tr>
+<tr><td>Dominators</td><td>D dominates B if every path from the entry to B goes through D. The standard tool for loop detection</td></tr>
+<tr><td>Back edges, natural loops</td><td>B → H with H dominating B. The loop is H plus the blocks that reach B without passing H</td></tr>
+<tr><td>Depth-first search</td><td>Visits every block reachable from B1. Whatever is left is dead code</td></tr>
+<tr><td><code>ifFalse</code></td><td>The Dragon Book's TAC jump-if-false. Its edges are the reverse of <code>if</code></td></tr>
+<tr><td>lex <code>^</code>, <code>/</code>, <code>yy_scan_string</code>, <code>%option</code></td><td>Start-of-line anchor, trailing context, scan from a string, no <code>yywrap</code></td></tr>
+<tr><td>Win32 GUI, GDI</td><td>Only the user interface. No compiler logic in <code>gui.c</code></td></tr>
+<tr><td>Graphviz DOT</td><td>Plain-text graph format. Graphviz lays out and renders the graph</td></tr>
+<tr><td>Bit flags (<code>leader_why</code>)</td><td>1, 2 and 4 OR-ed together, so one int holds several reasons</td></tr>
+<tr><td>assert tests</td><td>Automatic checks against hand-worked expected results</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="qa">19. Likely viva questions</h2>
+
+<h3>Basics</h3>
+<p><b>Q1. What is a control flow graph?</b></p>
+<div class="ans">A directed graph whose nodes are basic blocks and whose edges show which block can run right after which. It shows every possible path of execution through the program.</div>
+<p><b>Q2. What is a basic block?</b></p>
+<div class="ans">A maximal straight-line sequence of statements with one entry (the first statement) and one exit (the last). If the first statement runs, every statement in it runs, in order.</div>
+<p><b>Q3. What is a leader? Give the rules.</b></p>
+<div class="ans">The first statement of a basic block. The three rules: (1) the first statement of the program; (2) any target of a jump; (3) any statement right after a jump or return.</div>
+<p><b>Q4. Why build a CFG at all?</b></p>
+<div class="ans">Optimization needs it. Local optimizations work inside one basic block. Global ones such as loop optimization, dead-code elimination and data-flow analysis need to know how blocks connect. It is the first step of the code optimization phase.</div>
+<p><b>Q5. Why three-address code as input, not C source?</b></p>
+<div class="ans">The CFG is built on intermediate code in a real compiler. TAC makes every jump explicit (<code>goto</code>, <code>if…goto</code>), while C has nested <code>if</code>/<code>while</code>/<code>for</code> that would first need a full parser and translator. TAC is also exactly what Unit 3 teaches.</div>
+<p><b>Q6. Where does this sit among the compiler phases?</b></p>
+<div class="ans">After intermediate code generation, at the start of code optimization. Our lex scanner is a small front end that reads the TAC.</div>
+
+<h3>Lex</h3>
+<p><b>Q7. What does lex do here?</b></p>
+<div class="ans">It splits the TAC text into tokens: labels, the keywords goto/if/ifFalse/return/halt/exit, words (identifiers and numbers), operators, spaces and newlines. <code>flex tac.l</code> generates <code>lex.yy.c</code> with <code>yylex()</code>, which <code>cfg.c</code> calls in a loop.</div>
+<p><b>Q8. How is <code>iffy</code> not read as the keyword <code>if</code>?</b></p>
+<div class="ans">Lex's longest-match rule: <code>{ID}</code> matches all 4 characters of <code>iffy</code>, while <code>"if"</code> matches only 2, so the identifier rule wins.</div>
+<p><b>Q9. And how is <code>if</code> itself a keyword, when <code>{ID}</code> also matches it?</b></p>
+<div class="ans">Both match 2 characters, a tie. On a tie lex picks the rule written first, and the keyword rules are above <code>{ID}</code>.</div>
+<p><b>Q10. What is <code>/[^=]</code> in the label rule?</b></p>
+<div class="ans">Trailing context: the colon must be followed by a character that isn't <code>=</code>, but that character is not part of the token. It stops <code>i := 0</code> being read as a label <code>i</code>.</div>
+<p><b>Q11. What are <code>yytext</code> and <code>yylex</code>?</b></p>
+<div class="ans"><code>yylex()</code> is the scanner function lex generates. Each call returns the next token code. <code>yytext</code> is a <code>char *</code> to the text of the token just matched.</div>
+<p><b>Q12. What is <code>noyywrap</code>?</b></p>
+<div class="ans">When input ends, lex calls <code>yywrap()</code> to ask whether there is more input. <code>%option noyywrap</code> means "no more input", so we don't have to write that function.</div>
+<p><b>Q13. Why <code>yy_scan_string</code>?</b></p>
+<div class="ans">The input comes from the GUI's text box, not a file. <code>yy_scan_string</code> makes lex read from a string in memory.</div>
+
+<h3>CFG construction</h3>
+<p><b>Q14. How are edges added?</b></p>
+<div class="ans">From each block's last statement. goto: one edge to the target. if/ifFalse: two edges, to the target and to the next block. return: to EXIT. Anything else: falls through to the next block.</div>
+<p><b>Q15. Why are ENTRY and EXIT nodes added?</b></p>
+<div class="ans">They give the graph a single start and a single end. ENTRY → B1 and every return → EXIT. That makes the dominator and data-flow algorithms uniform.</div>
+<p><b>Q16. What if a conditional jumps to the very next statement?</b></p>
+<div class="ans">The true and false edges go to the same block, so we keep one edge labelled <code>true/false</code> instead of two edges on top of each other.</div>
+<p><b>Q17. Maximum number of successors of a block? Predecessors?</b></p>
+<div class="ans">Successors: at most 2, from a conditional. Predecessors: any number, because many jumps can target the same block.</div>
+
+<h3>Analysis</h3>
+<p><b>Q18. Define dominator. How do you compute it?</b></p>
+<div class="ans">D dominates B if every path from the entry to B goes through D. Iteratively: Dom(B1) = {B1}, start every other block at "all blocks", then repeat Dom(B) = {B} ∪ the intersection of Dom(P) over its predecessors until nothing changes.</div>
+<p><b>Q19. Why start with "all blocks" and not the empty set?</b></p>
+<div class="ans">We keep intersecting, and an intersection can only shrink a set. Starting from "all" lets each set shrink down to the right answer. Starting from empty, the intersection would stay empty.</div>
+<p><b>Q20. What is a back edge? A natural loop?</b></p>
+<div class="ans">A back edge is B → H where H dominates B. Its natural loop is H plus every block that can reach B without going through H. H is the loop header.</div>
+<p><b>Q21. How do you find the loop body?</b></p>
+<div class="ans">Put H and B in the loop and push B on a stack. Pop a block and add each of its predecessors not already in the loop, pushing them too. H is already in the loop, so the search never goes past it.</div>
+<p><b>Q22. In the nested example, which loop is inner?</b></p>
+<div class="ans">Loop 1 (header B4, body {B4, B5}) is the inner j loop. Loop 2 (header B2, body {B2–B6}) is the outer i loop. Loop 1's body is a subset of loop 2's.</div>
+<p><b>Q23. How do you find unreachable code?</b></p>
+<div class="ans">A depth-first search from B1 along the edges. Any block it doesn't visit can never run. That's dead code, which could be deleted.</div>
+<p><b>Q24. Give an optimization the CFG enables in your samples.</b></p>
+<div class="ans">Loop-invariant code motion: in nested_loop, <code>t1 = i * m</code> doesn't change inside the j loop, so it can move to B3, before that loop. Dead-code elimination: B2 in unreachable.tac can be deleted.</div>
+<p><b>Q25. Complexity?</b></p>
+<div class="ans">Leaders, blocks and edges are O(n). The dominator sweep is O(n³) per pass. Natural loops are O(n²) each. With the 500-statement limit that runs instantly.</div>
+
+<h3>Implementation</h3>
+<p><b>Q26. Why fixed arrays instead of linked lists or malloc?</b></p>
+<div class="ans">The input size is bounded (500 statements), so arrays are simpler: no allocation or freeing, no leaks, and an index works as a pointer. <code>Cfg</code> is a static global because ~0.9 MB is too big for the stack.</div>
+<p><b>Q27. How are errors reported?</b></p>
+<div class="ans"><code>cfg_build</code> returns -1 and puts <code>"Line N: message"</code> in <code>g-&gt;err</code>. The GUI shows it in the status bar and report box, and draws no graph.</div>
+<p><b>Q28. What does <code>gui.c</code> do?</b></p>
+<div class="ans">Only the interface: the Win32 window, buttons, text boxes, the Open/Save dialogs, and drawing the graph with GDI. It calls <code>cfg_build</code>, <code>cfg_report</code> and <code>cfg_dot</code>, and has no CFG logic itself.</div>
+<p><b>Q29. How did you test it?</b></p>
+<div class="ans"><code>test_cfg.c</code> has 22 assert-based tests. The expected leaders, blocks, edges, dominators and loops for 5 samples were worked out by hand, and every error message has a test. Tricky inputs like CRLF line endings, <code>iffy</code>, <code>:=</code> and <code>if(</code> are tested too.</div>
+<p><b>Q30. Limitations / future work?</b></p>
+<div class="ans">It stops at the first error. It handles one procedure (no call graph). It only detects loops; it doesn't perform the optimizations. Next steps would be data-flow analysis (reaching definitions, live variables) and actually doing code motion and dead-code elimination.</div>
+
+<!-- ============================================================ -->
+<h2 id="nums">20. Numbers to remember</h2>
+<table class="mono">
+<tr><th>What</th><th class="c">Value</th></tr>
+<tr><td>Leader rules</td><td class="c">3</td></tr>
+<tr><td>Statement kinds</td><td class="c">5 (plain, goto, if, ifFalse, return)</td></tr>
+<tr><td>Max successors per block</td><td class="c">2</td></tr>
+<tr><td>Limits: statements / line / label</td><td class="c">500 / 255 / 31</td></tr>
+<tr><td>Lex token types</td><td class="c">9 + end of input</td></tr>
+<tr><td>Error messages</td><td class="c">9</td></tr>
+<tr><td>Samples</td><td class="c">5</td></tr>
+<tr><td>Test functions</td><td class="c">22</td></tr>
+<tr><td>while_loop</td><td class="c">4 blocks, 6 edges, 1 loop</td></tr>
+<tr><td>nested_loop</td><td class="c">7 blocks, 10 edges, 2 loops</td></tr>
+<tr><td>Lines: tac.l / cfg.c / gui.c</td><td class="c">31 / 335 / 343</td></tr>
+</table>
+
+<footer>Prints cleanly on A4 (Ctrl+P). Night before: read sections 1, 7, 10, 11, 12 and 19.</footer>
+</main>
+</body>
+</html>
