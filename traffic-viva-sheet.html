@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Project Viva Sheet — Smart City Traffic Signal Optimization (NSGA-II)</title>
+<link rel="stylesheet" href="assets/fuzzy-notes.css">
+</head>
+<body>
+<main>
+<header class="unit">
+  <div class="kicker">Evolutionary Computing · Semester Project Viva · Soham Sharma, Naitik Sah, Arpita Rana</div>
+  <h1>Smart City Traffic Signal Optimization Using Multi-Objective Genetic Algorithm — viva sheet</h1>
+  <p class="src">Code: <code>traffic.py</code>, <code>nsga2.py</code>, <code>main.py</code>, <code>test_project.py</code> in <code>D:\files\stud\evo\traffic_signal_moga</code>. Every number on this sheet comes from the actual run (<code>results/RESULTS.md</code>). Back: <a href="index.html">Interview Prep</a></p>
+</header>
+
+<nav class="toc"><b>Contents</b>
+<ol>
+  <li><a href="#pitch">30-second pitch</a></li>
+  <li><a href="#glance">Project at a glance</a></li>
+  <li><a href="#why">Problem and why a multi-objective GA</a></li>
+  <li><a href="#terms">Traffic signal terms</a></li>
+  <li><a href="#ga">GA basics</a></li>
+  <li><a href="#moo">Pareto dominance and the front</a></li>
+  <li><a href="#nsga">NSGA-II step by step</a></li>
+  <li><a href="#hv">Hypervolume</a></li>
+  <li><a href="#model">Traffic model</a></li>
+  <li><a href="#chrom">Chromosome and decoding</a></li>
+  <li><a href="#obj">The four objectives</a></li>
+  <li><a href="#ops">SBX and polynomial mutation</a></li>
+  <li><a href="#exp">Experiment design and baselines</a></li>
+  <li><a href="#res">Results</a></li>
+  <li><a href="#code">Code walkthrough</a></li>
+  <li><a href="#test">Testing</a></li>
+  <li><a href="#report">Report structure</a></li>
+  <li><a href="#limits">Limitations and future work</a></li>
+  <li><a href="#qa">Likely viva questions</a></li>
+  <li><a href="#nums">Numbers to remember</a></li>
+</ol></nav>
+
+<!-- ============================================================ -->
+<h2 id="pitch">1. 30-second pitch</h2>
+<div class="def"><b>Say this first:</b> "We simulated a 3 × 3 grid of 9 signalised junctions and used <b>NSGA-II</b>, which we wrote ourselves in NumPy, to tune the signal timings. Each chromosome holds one shared <b>cycle length</b> plus a <b>green split</b> and an <b>offset</b> for every junction. We minimised four objectives at once: <b>congestion, waiting time, fuel and NOx pollution</b>. On random traffic the optimiser never saw, our selected plan cut waiting time by <b>30.8 %</b> and congestion by <b>35.6 %</b> compared with Webster's method. Most of the gain came from coordinating offsets into green waves."</div>
+<div class="tip">Then stop and let the examiner pick a direction. Common follow-ups: "what is a Pareto front?" (section 6), "why NSGA-II?" (section 7), "why a shared cycle?" (section 10), "how do you know it works?" (sections 13–14).</div>
+
+<!-- ============================================================ -->
+<h2 id="glance">2. Project at a glance</h2>
+<table>
+<tr><th>Item</th><th>Value</th></tr>
+<tr><td>Title</td><td>Smart City Traffic Signal Optimization Using Multi-Objective Genetic Algorithm</td></tr>
+<tr><td>Objective</td><td>Minimize traffic congestion, vehicle waiting time, fuel consumption and pollution by optimizing traffic-signal timings</td></tr>
+<tr><td>Network</td><td>3 × 3 grid, junctions J1–J9, 36 approach links, unequal block lengths</td></tr>
+<tr><td>Decision variables</td><td>19 real genes: shared cycle + (green split, offset) × 9 junctions</td></tr>
+<tr><td>Objectives</td><td>Congestion (veh), waiting (s/veh), fuel (mL/veh), NOx (g/veh), all minimised</td></tr>
+<tr><td>Algorithm</td><td>NSGA-II from first principles: population 100, 300 generations, 30,100 evaluations per run</td></tr>
+<tr><td>Runs</td><td>11 seeds for NSGA-II, 11 for random search (control)</td></tr>
+<tr><td>Baselines</td><td>Fixed-time (60 s, equal split) and Webster's method</td></tr>
+<tr><td>Language / libraries</td><td>Python 3.12, NumPy, Matplotlib. No GA library</td></tr>
+<tr><td>Runtime</td><td>About 17 minutes using 8 worker processes</td></tr>
+<tr><td>Tests</td><td><code>test_project.py</code>: 12 assert-based checks</td></tr>
+</table>
+<h3>Pipeline</h3>
+<ol class="steps">
+  <li><b>Build the network</b>: routing matrix, demand, link lengths (<code>traffic.py</code>).</li>
+  <li><b>Random population</b> of 100 signal plans.</li>
+  <li><b>Decode</b> each chromosome into cycle, greens and offsets.</li>
+  <li><b>Simulate</b> all plans together for 1800 s of demand + 300 s clearance.</li>
+  <li><b>Score</b> 4 objectives per plan.</li>
+  <li><b>NSGA-II loop</b>: rank, crowding, tournament, SBX, mutation, elitist survival. 300 generations.</li>
+  <li><b>Pick one plan</b> from the Pareto front: closest to the ideal point.</li>
+  <li><b>Validate</b>: compare with baselines on 30 random-traffic seeds and at 80 / 100 / 120 % demand.</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="why">3. Problem and why a multi-objective GA</h2>
+<ul>
+  <li>Signal timings decide how long vehicles stop. Bad timings mean long queues, repeated stopping, wasted fuel and more emissions.</li>
+  <li>Classic methods such as Webster tune <b>one junction at a time</b> and target <b>one goal</b> (delay). A city needs network-wide timing and several goals.</li>
+  <li>The goals <b>conflict</b>: shorter cycles reduce waiting but cause more stop-start driving, which costs fuel and NOx. So there is no single best plan, only trade-offs.</li>
+  <li>The simulator is a <b>black box</b>: no formula or gradient links timings to objectives. A GA only needs to evaluate solutions, so it fits.</li>
+  <li>A GA keeps a <b>population</b>, so one run can return a whole set of trade-off plans (the Pareto front).</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="terms">4. Traffic signal terms</h2>
+<table>
+<tr><th>Term</th><th>Meaning</th><th>In our project</th></tr>
+<tr><td>Cycle length (C)</td><td>Time for the signal to go through all phases once</td><td>40–120 s, one value shared by all 9 junctions. Selected: 43 s</td></tr>
+<tr><td>Phase</td><td>A set of movements that get green together</td><td>2 phases: north-south, then east-west</td></tr>
+<tr><td>Green split</td><td>How the usable green is shared between phases</td><td>Gene sᵢ per junction</td></tr>
+<tr><td>Lost time</td><td>Time in each cycle no one moves (amber, all-red, start-up)</td><td>4 s after each phase, 8 s per cycle</td></tr>
+<tr><td>Offset</td><td>Shift of a junction's cycle start relative to the others</td><td>Gene oᵢ per junction</td></tr>
+<tr><td>Saturation flow (s)</td><td>Discharge rate of a queue on green</td><td>0.5 veh/s = 1800 veh/h per approach</td></tr>
+<tr><td>Flow ratio (y)</td><td>Arrival flow ÷ saturation flow</td><td>Y (sum over phases) is 0.64–0.78; J4 is critical at 0.775</td></tr>
+<tr><td>Capacity</td><td>s × green ÷ C</td><td>A shorter cycle wastes a bigger share on lost time</td></tr>
+<tr><td>Platoon</td><td>A group of vehicles released together on green</td><td>Spreads out on the way (Robertson dispersion)</td></tr>
+<tr><td>Green wave</td><td>Offsets set so a platoon meets green at each junction in turn</td><td>The main source of our gain</td></tr>
+<tr><td>Fixed-time control</td><td>Timings repeat the same every cycle</td><td>Our output is a fixed-time plan</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="ga">5. GA basics in this project</h2>
+<table>
+<tr><th>GA term</th><th>Meaning</th><th>Here</th></tr>
+<tr><td>Chromosome</td><td>Encoded solution</td><td>19 real numbers = one signal plan</td></tr>
+<tr><td>Population</td><td>Solutions evolved together</td><td>100 plans</td></tr>
+<tr><td>Fitness</td><td>How good a solution is</td><td>4 objective values from the simulator</td></tr>
+<tr><td>Selection</td><td>Better ones become parents more often</td><td>Binary tournament on rank, then crowding distance</td></tr>
+<tr><td>Crossover</td><td>Combine two parents</td><td>Simulated binary crossover (SBX)</td></tr>
+<tr><td>Mutation</td><td>Small random change, keeps diversity</td><td>Polynomial mutation</td></tr>
+<tr><td>Elitism</td><td>The best are never lost</td><td>Parents and children compete; best 100 survive</td></tr>
+<tr><td>Termination</td><td>When to stop</td><td>Fixed budget: 300 generations</td></tr>
+</table>
+<ul>
+  <li><b>Exploration</b> (new regions) comes mainly from mutation and the random start. <b>Exploitation</b> (refining good regions) comes from selection and crossover.</li>
+  <li><b>Real-coded</b> GA: genes are real numbers, not bits, because cycle, split and offset are continuous quantities.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="moo">6. Pareto dominance and the Pareto front</h2>
+<div class="def"><b>Dominance:</b> plan a dominates plan b if a is <b>no worse in all four objectives</b> and <b>strictly better in at least one</b>.</div>
+<div class="def"><b>Pareto front:</b> the plans that no other plan dominates. Along it, improving one objective means worsening another.</div>
+<h3>Why not add the objectives with weights?</h3>
+<ul>
+  <li>The units differ (veh, s/veh, mL/veh, g/veh), so any weights are arbitrary.</li>
+  <li>One weighted run gives one plan. Seeing the trade-off would need a run per weight setting.</li>
+  <li>A weighted sum cannot reach non-convex parts of the front.</li>
+</ul>
+<h3>Choosing the plan to deploy</h3>
+<p>Normalise each objective on the front to the range 0–1, then pick the plan with the smallest distance to the ideal point (0, 0, 0, 0). This gives a balanced compromise with no weights.</p>
+<pre>scaled = (F - F.min(0)) / np.ptp(F, axis=0)
+chosen = int(np.argmin(np.linalg.norm(scaled, axis=1)))</pre>
+
+<!-- ============================================================ -->
+<h2 id="nsga">7. NSGA-II step by step</h2>
+<p>Non-dominated Sorting Genetic Algorithm II, Deb, Pratap, Agarwal and Meyarivan, 2002.</p>
+<ol class="steps">
+  <li><b>Initialise</b> 100 random plans and simulate them.</li>
+  <li><b>Non-dominated sorting</b>: rank 0 = Pareto front; remove it, the next front is rank 1, and so on.</li>
+  <li><b>Crowding distance</b> within each front.</li>
+  <li><b>Binary tournament</b>: two random plans; lower rank wins; on a tie, larger crowding distance wins.</li>
+  <li><b>SBX + polynomial mutation</b> create 100 children; simulate them.</li>
+  <li><b>Merge</b> parents and children (200), re-rank, keep the best 100 by rank then crowding. This is <b>elitism</b>.</li>
+  <li>Repeat 300 times. Return rank 0.</li>
+</ol>
+<h3>Crowding distance</h3>
+<div class="eq">CD(i) = Σ<sub>m</sub> ( f<sub>m</sub>(i+1) − f<sub>m</sub>(i−1) ) / ( f<sub>m</sub><sup>max</sup> − f<sub>m</sub><sup>min</sup> )</div>
+<p>Sort the front by each objective; the two ends get infinity so extremes always survive; inner points get the normalised gap between their neighbours. A larger distance means a lonelier point, which is preferred, so the front stays spread out.</p>
+<h3>Why NSGA-II improved on NSGA</h3>
+<ol>
+  <li><b>Fast non-dominated sorting</b>: O(M N²) instead of O(M N³).</li>
+  <li><b>Elitism</b>: parents compete with children.</li>
+  <li><b>Crowding distance</b> replaces the sharing parameter σ, so there is no niche radius to tune.</li>
+</ol>
+<div class="tip"><b>Rank</b> drives convergence (towards the front). <b>Crowding</b> drives diversity (along the front).</div>
+
+<!-- ============================================================ -->
+<h2 id="hv">8. Hypervolume</h2>
+<div class="def"><b>Hypervolume:</b> the size of the objective-space region a front dominates, up to a reference point. Bigger is better. It rewards both convergence and spread in one number.</div>
+<ul>
+  <li>4 objectives make exact computation awkward, so we estimate it by <b>Monte Carlo</b>: 100,000 fixed random points in the normalised box [0, 1.1]⁴. Hypervolume = share of points dominated by at least one front member.</li>
+  <li>The box is normalised using the final fronts of <b>all</b> runs of both methods, so every number is on the same scale.</li>
+  <li>Computed every 10 generations to draw the convergence curve.</li>
+</ul>
+<pre>def hypervolume(F, ideal, nadir, samples):
+    points = (F - ideal) / (nadir - ideal)
+    return float((points[None] &lt;= samples[:, None]).all(2).any(1).mean())</pre>
+
+<!-- ============================================================ -->
+<h2 id="model">9. Traffic model</h2>
+<table>
+<tr><th>Parameter</th><th>Value</th></tr>
+<tr><td>Block lengths</td><td>Rows 290 m and 410 m; columns 340 m and 470 m (deliberately unequal)</td></tr>
+<tr><td>Free-flow speed</td><td>54 km/h. Travel delays of 15, 18, 22 and 25 s</td></tr>
+<tr><td>Saturation flow</td><td>0.5 veh/s per approach</td></tr>
+<tr><td>Turning</td><td>80 % straight, 10 % left, 10 % right, no U-turns</td></tr>
+<tr><td>Demand</td><td>Entry rates 0.13 / 0.11 / 0.21 / 0.17 veh/s for S / N / E / W-bound, each × a fixed random 0.85–1.15 (seed 42). About 1.91 veh/s, ≈ 3443 vehicles in 30 min</td></tr>
+<tr><td>Simulation</td><td>1800 s of demand + 300 s clearance, 1 s step</td></tr>
+</table>
+<h3>Queue (store-and-forward) model</h3>
+<pre>queue  = queue + arrivals
+served = min(queue, saturation × green)        # discharge only on green
+queue  = queue − served</pre>
+<ul>
+  <li><b>Point queue</b>: vehicles stack at the stop line with no length limit, so no spillback.</li>
+  <li><b>Routing matrix R</b> (36 × 36): R[a, b] = share of link a's outflow that enters link b. Rows sum to 1 inside the grid, less at the edge where vehicles leave.</li>
+  <li><b>Robertson platoon dispersion</b> (TRANSYT): released platoons spread out on the way. Delay = 0.8 × free-flow time T; smoothing factor F = 1 / (1 + 0.35 × 0.8 × T).</li>
+  <li><b>Stop</b>: an arriving vehicle counts as a stop if the signal is red or a queue already exists.</li>
+  <li><b>Clearance</b>: 300 s with no new demand, so a plan can't look good by leaving vehicles stuck at the end.</li>
+  <li><b>Fluid vs Poisson</b>: the search uses smooth average flows. With a seed, arrivals become Poisson random counts, used only for testing.</li>
+</ul>
+<div class="tip">If asked "why unequal blocks and dispersion?": with equal 300 m blocks and no dispersion, a 40 s cycle gave a perfect two-way green wave (travel 20 s = half a cycle), which exaggerated the gains. Unequal blocks and dispersion make it realistic.</div>
+
+<!-- ============================================================ -->
+<h2 id="chrom">10. Chromosome and decoding</h2>
+<div class="eq">x = [ C, s₁, o₁, s₂, o₂, …, s₉, o₉ ]   (1 + 2 × 9 = 19 genes)</div>
+<table>
+<tr><th>Gene</th><th>Range</th><th>Decoded as</th></tr>
+<tr><td>C</td><td>40–120 s</td><td>Cycle, rounded to whole seconds, shared by all junctions</td></tr>
+<tr><td>sᵢ</td><td>0–1</td><td>N-S green = sᵢ × (C − 8), clipped so each green ≥ 10 s; E-W green = the rest</td></tr>
+<tr><td>oᵢ</td><td>0–1</td><td>Offset = oᵢ × C seconds</td></tr>
+</table>
+<pre>|— N-S green —|— 4 s lost —|— E-W green —|— 4 s lost —|   repeats every C seconds
+phase = (t + offset) mod C</pre>
+<h3>Why one shared cycle? (the design story)</h3>
+<p>Our first version gave each junction its own green times, so each had its own cycle. Then the timing difference between neighbours <b>drifts every cycle</b>: offsets mean nothing and no green wave can form. That version could not even beat Webster. With one shared cycle, offsets stay fixed and coordination works. This is also standard practice for coordinated signals.</p>
+<h3>Why genes as fractions?</h3>
+<ul>
+  <li>The split and offset are fractions of the cycle, so a change in C keeps every plan valid.</li>
+  <li>Decoding enforces the 10 s minimum green and the cycle limits, so <b>every chromosome is feasible</b>. No penalty function or repair is needed.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="obj">11. The four objectives</h2>
+<table>
+<tr><th>Objective</th><th>Formula</th><th>Unit</th></tr>
+<tr><td>Congestion</td><td>Mean over the 36 links of each link's peak queue</td><td>veh</td></tr>
+<tr><td>Waiting time</td><td>W / N</td><td>s/veh</td></tr>
+<tr><td>Fuel</td><td>1000 × (0.00028 W + 0.012 S + 0.07 D) / N</td><td>mL/veh</td></tr>
+<tr><td>Pollution (NOx)</td><td>(0.0008 W + 0.06 S + 0.4 D) / N</td><td>g/veh</td></tr>
+</table>
+<p>W = total queued vehicle-seconds, S = total stops, D = total vehicle-km, N = vehicles that entered.</p>
+<table>
+<tr><th>Rate</th><th>Idling</th><th>Per stop</th><th>Per km</th></tr>
+<tr><td>Fuel</td><td>0.00028 L/s (≈ 1 L/h)</td><td>0.012 L</td><td>0.07 L</td></tr>
+<tr><td>NOx</td><td>0.0008 g/s</td><td>0.06 g</td><td>0.4 g</td></tr>
+</table>
+<ul>
+  <li><b>Why NOx, not CO₂?</b> CO₂ = 2.31 kg per litre of petrol, so it is just fuel × a constant and would duplicate the fuel objective. NOx is driven mostly by stops (acceleration), so it measures something different. CO₂ is still reported as a derived value.</li>
+  <li><b>Why peak queue for congestion?</b> Average queue is proportional to waiting time (Little's law), so it would duplicate waiting. Peak queue shows how close links come to overflowing.</li>
+  <li>The fuel and NOx rates are <b>assumed order-of-magnitude values</b>, not calibrated to a real fleet. Compare percentages between plans, not absolute values.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="ops">12. SBX and polynomial mutation</h2>
+<h3>Simulated binary crossover (SBX), η = 15</h3>
+<pre>u = random(0, 1)
+β = (2u)^(1/(η+1))                if u ≤ 0.5
+β = (1 / (2(1 − u)))^(1/(η+1))    otherwise
+child1 = 0.5 × ((1 + β) p1 + (1 − β) p2)
+child2 = 0.5 × ((1 − β) p1 + (1 + β) p2)</pre>
+<ul>
+  <li>Behaves like one-point crossover on bits, but for real numbers. Children land near the parents.</li>
+  <li>Larger η keeps children closer to the parents. The two children's mean equals the parents' mean.</li>
+  <li>A pair crosses with probability 0.9; within a pair, each gene crosses with probability 0.5.</li>
+</ul>
+<h3>Polynomial mutation, η = 20</h3>
+<pre>δ = (2u)^(1/(η+1)) − 1            if u &lt; 0.5
+δ = 1 − (2(1 − u))^(1/(η+1))      otherwise
+x' = clip(x + δ × (high − low), low, high)</pre>
+<p>Each gene mutates with probability 1/19, so on average one gene per child changes. Small changes are much more likely than big ones. Clipping keeps every gene inside its bounds.</p>
+
+<!-- ============================================================ -->
+<h2 id="exp">13. Experiment design and baselines</h2>
+<h3>Baseline 1: fixed-time</h3>
+<p>60 s cycle, equal greens (26 s each), zero offsets. A typical default plan.</p>
+<h3>Baseline 2: Webster's method (1958)</h3>
+<div class="eq">C₀ = (1.5 L + 5) / (1 − Y),   green for each phase ∝ its flow ratio y</div>
+<ul>
+  <li>L = 8 s lost per cycle. y = critical arrival flow ÷ saturation flow for each phase; Y = y<sub>NS</sub> + y<sub>EW</sub>.</li>
+  <li>J4 has the largest Y (0.775), so C₀ = 17 / (1 − 0.775) = <b>75.7 s</b>, used as the common cycle. Offsets are zero, because Webster treats each junction alone.</li>
+</ul>
+<h3>Making the results trustworthy</h3>
+<table>
+<tr><th>Step</th><th>Why</th></tr>
+<tr><td>11 independent seeds</td><td>A GA is random; one run proves little</td></tr>
+<tr><td>Report the <b>median</b> run</td><td>Not the luckiest run</td></tr>
+<tr><td>Random search, same 30,100 evaluations</td><td>Shows the GA operators matter, not just the number of tries</td></tr>
+<tr><td>30 Poisson traffic seeds</td><td>Test on traffic the optimiser never saw; checks for overfitting to smooth demand</td></tr>
+<tr><td>Common random numbers</td><td>All plans get the same arrivals for each seed, so the comparison is fair</td></tr>
+<tr><td>80 / 100 / 120 % demand</td><td>Checks robustness when traffic changes</td></tr>
+<tr><td>Ablation: offsets set to zero</td><td>Measures how much coordination contributes</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="res">14. Results</h2>
+<h3>Search quality</h3>
+<ul>
+  <li><b>Hypervolume</b> (11 runs): NSGA-II <b>0.907</b> (sd 0.062), random search <b>0.032</b> (sd 0.033). Random search barely improves.</li>
+  <li>The median NSGA-II run returned <b>100</b> non-dominated plans. Waiting ranges 26.7–28.8 s/veh and fuel 88.7–89.8 mL/veh across the front.</li>
+  <li>All 11 runs settled on short cycles of <b>40–43 s</b>.</li>
+</ul>
+<h3>Selected plan vs baselines (30 Poisson seeds, mean)</h3>
+<table>
+<tr><th>Objective</th><th>Fixed-time</th><th>Webster</th><th>NSGA-II selected</th><th>vs Webster</th><th>vs Fixed</th></tr>
+<tr><td>Congestion (veh)</td><td>11.28</td><td>11.29</td><td><b>7.27</b></td><td>−35.6 %</td><td>−35.6 %</td></tr>
+<tr><td>Waiting (s/veh)</td><td>76.04</td><td>64.02</td><td><b>44.33</b></td><td>−30.8 %</td><td>−41.7 %</td></tr>
+<tr><td>Fuel (mL/veh)</td><td>105.58</td><td>98.87</td><td><b>94.42</b></td><td>−4.5 %</td><td>−10.6 %</td></tr>
+<tr><td>NOx (g/veh)</td><td>0.520</td><td>0.494</td><td><b>0.484</b></td><td>−2.1 %</td><td>−7.1 %</td></tr>
+</table>
+<p>Smooth demand (used in the search): waiting 66.77 / 59.30 / 27.08 s/veh for fixed / Webster / NSGA-II.</p>
+<h3>Selected plan</h3>
+<table class="mono">
+<tr><th>Junction</th><th class="c">J1</th><th class="c">J2</th><th class="c">J3</th><th class="c">J4</th><th class="c">J5</th><th class="c">J6</th><th class="c">J7</th><th class="c">J8</th><th class="c">J9</th></tr>
+<tr><td>N-S green (s)</td><td class="c">16</td><td class="c">13</td><td class="c">12</td><td class="c">14</td><td class="c">14</td><td class="c">13</td><td class="c">17</td><td class="c">14</td><td class="c">14</td></tr>
+<tr><td>E-W green (s)</td><td class="c">19</td><td class="c">22</td><td class="c">23</td><td class="c">21</td><td class="c">21</td><td class="c">22</td><td class="c">18</td><td class="c">21</td><td class="c">21</td></tr>
+<tr><td>Offset (s)</td><td class="c">23</td><td class="c">43</td><td class="c">20</td><td class="c">5</td><td class="c">28</td><td class="c">4</td><td class="c">28</td><td class="c">5</td><td class="c">26</td></tr>
+</table>
+<p>Common cycle <b>43 s</b> (= 35 s green + 8 s lost). East–west gets more green at every junction, matching the heavier arterial demand.</p>
+<h3>Key findings</h3>
+<ul>
+  <li><b>Coordination is the main gain.</b> Setting the plan's offsets to zero raises waiting from 44.3 to <b>55.7</b> s/veh.</li>
+  <li><b>Smooth demand is optimistic.</b> Gain over Webster: 54.3 % on smooth demand, 30.8 % on random traffic. Green waves suffer when arrivals are irregular.</li>
+  <li><b>Objectives form two groups</b> on the front: congestion–waiting correlation +0.98, fuel–NOx +0.99, but waiting–fuel −0.84. The real conflict is "keep vehicles moving" vs "avoid stop-start driving".</li>
+  <li><b>Fuel and NOx gain less</b>: every plan drives the same distance, a large fixed part of both. Only idling and stops can change.</li>
+  <li><b>Queues</b>: fixed-time's network queue keeps growing during demand (it lacks capacity at the busiest junctions); Webster settles near 115 vehicles, our plan near 52.</li>
+</ul>
+<table>
+<tr><th>Waiting (s/veh) by demand level</th><th>Fixed-time</th><th>Webster</th><th>NSGA-II</th></tr>
+<tr><td>80 %</td><td>55.1</td><td>55.4</td><td><b>29.0</b></td></tr>
+<tr><td>100 %</td><td>76.0</td><td>64.0</td><td><b>44.3</b></td></tr>
+<tr><td>120 %</td><td>127.3</td><td><b>87.8</b></td><td>119.9</td></tr>
+</table>
+<div class="tip">Mention the weakness before they find it. At 120 % demand our plan is worse than Webster. Why: usable green share is (C − 8)/C = 35/43 = 0.81 for our plan vs 0.89 for Webster's 76 s cycle. At 120 % demand J4 needs Y = 0.775 × 1.2 = 0.93, more than both can give, and ours falls shorter. Fix: optimise over several demand scenarios, or use time-of-day plans.</div>
+<div class="two">
+<figure><img src="assets/traffic-viva/convergence.png" alt="Hypervolume against generation: NSGA-II rises to about 0.93, random search stays near 0"><figcaption>Hypervolume: NSGA-II vs random search</figcaption></figure>
+<figure><img src="assets/traffic-viva/pareto_front.png" alt="Waiting against fuel: overview with baselines, and zoomed Pareto front"><figcaption>Pareto front: overview and zoom</figcaption></figure>
+<figure><img src="assets/traffic-viva/improvement.png" alt="Percentage reduction versus fixed-time for Webster and NSGA-II across four objectives"><figcaption>Reduction vs fixed-time (Poisson)</figcaption></figure>
+<figure><img src="assets/traffic-viva/queue_over_time.png" alt="Vehicles queued over 35 minutes: fixed-time keeps growing, Webster about 115, NSGA-II about 52"><figcaption>Queued vehicles over time</figcaption></figure>
+</div>
+<figure><img src="assets/traffic-viva/signal_timings.png" alt="Phase layout of each junction in the selected 43 second plan" style="max-width:620px"><figcaption>Selected plan: phase layout at each junction</figcaption></figure>
+
+<!-- ============================================================ -->
+<h2 id="code">15. Code walkthrough</h2>
+<table>
+<tr><th>File</th><th>What it contains</th></tr>
+<tr><td><code>traffic.py</code></td><td>Constants; <code>build_routing</code>, <code>build_feeders</code>, <code>build_demand</code>, <code>build_link_lengths</code>; <code>decode</code>; <code>simulate</code>; <code>fixed_plan</code>, <code>webster_plan</code></td></tr>
+<tr><td><code>nsga2.py</code></td><td><code>pareto_rank</code>, <code>crowding_distance</code>, <code>tournament</code>, <code>crossover</code> (SBX), <code>mutate</code> (polynomial), <code>nsga2</code>, <code>random_search</code></td></tr>
+<tr><td><code>main.py</code></td><td>22 searches in parallel with <code>multiprocessing.Pool</code>, hypervolume, plan selection, Poisson and demand tests, 6 figures, <code>results.json</code>, <code>RESULTS.md</code></td></tr>
+<tr><td><code>test_project.py</code></td><td>12 assert checks</td></tr>
+<tr><td><code>MODEL.md</code>, <code>README.md</code></td><td>Model details and how to run</td></tr>
+</table>
+
+<h3>Building the routing matrix</h3>
+<pre>for row in range(ROWS):
+    for col in range(COLS):
+        for d in range(4):                                   # approach direction
+            for h, (dr, dc) in enumerate(HEADINGS):          # heading after the junction
+                is_turn = h // 2 != d // 2
+                if h != d and not is_turn:
+                    continue                                 # no U-turns
+                r, c = row + dr, col + dc
+                if 0 &lt;= r &lt; ROWS and 0 &lt;= c &lt; COLS:          # still inside the grid
+                    share = STRAIGHT if h == d else TURN
+                    routing[link_id(row, col, d), link_id(r, c, h)] = share</pre>
+<ul>
+  <li>Directions 0, 1 are N-S and 2, 3 are E-W, so <code>h // 2 != d // 2</code> means the vehicle changes axis: a turn.</li>
+  <li>If the next junction is outside the grid, nothing is written: those vehicles leave the network.</li>
+  <li>Steady flow on each link is solved in one line: <code>np.linalg.solve(I − Rᵀ, demand)</code>. Webster uses it.</li>
+</ul>
+
+<h3>Decoding a whole population at once</h3>
+<pre>def decode(x):
+    cycle = np.rint(x[:, :1])                        # gene 0, kept 2-D for broadcasting
+    usable = cycle - 2 * LOST
+    green_ns = np.clip(np.rint(x[:, 1::2] * usable), GREEN_MIN, usable - GREEN_MIN)
+    green_ew = usable - green_ns
+    offset = np.rint(x[:, 2::2] * cycle)
+    return green_ns, green_ew, cycle, offset</pre>
+<ul>
+  <li><code>x</code> is (plans, 19). <code>x[:, 1::2]</code> = genes 1, 3, 5 … (splits). <code>x[:, 2::2]</code> = genes 2, 4, 6 … (offsets).</li>
+  <li><code>x[:, :1]</code> has shape (plans, 1), so it broadcasts against the 9 junctions.</li>
+  <li><code>np.clip</code> enforces the 10 s minimum green on both phases.</li>
+</ul>
+
+<h3>One simulated second (inside <code>simulate</code>)</h3>
+<pre>phase = (t + offset) % cycle
+ns = phase &lt; green_ns
+ew = (phase &gt;= green_ns + LOST) &amp; (phase &lt; green_ns + LOST + green_ew)
+green = np.stack([ns, ns, ew, ew], axis=2).reshape(plans, LINKS)
+
+platoon += SMOOTHING * (in_transit[t % BUFFER] - platoon)     # Robertson dispersion
+arrivals = platoon (+ external demand while t &lt; 1800)
+stops = stops + (arrivals * (~green | (queue &gt; 0))).sum(1)
+queue += arrivals
+served = np.minimum(queue, SATURATION * green)
+queue -= served
+leaving = (served[:, FEEDERS] * FEEDER_SHARES).sum(2)          # = served @ ROUTING
+in_transit[(t + DELAY) % BUFFER, :, link_index] = leaving.T    # arrive DELAY s later</pre>
+<ul>
+  <li><b>Vectorised</b>: arrays are (plans × links), so all 100 plans are simulated together with no Python loop over plans. A generation takes a fraction of a second.</li>
+  <li><code>green</code>: each junction's N-S flag is copied to its two N-S approaches, E-W to its two E-W approaches.</li>
+  <li><code>in_transit</code> is a <b>ring buffer</b> of 26 time slots: vehicles leaving now are stored in the slot for <code>t + DELAY</code>.</li>
+  <li><code>FEEDERS</code>: each link has at most 3 feeders (straight, left, right), so a gather-and-sum replaces a 36 × 36 matrix multiply. A test proves both are equal.</li>
+  <li>Objectives at the end: <code>congestion = peak.mean(1)</code>, <code>waiting = wait / entered</code>, and the fuel and NOx formulas.</li>
+</ul>
+
+<h3>Non-dominated sorting in one expression</h3>
+<pre>def pareto_rank(F):
+    dominates = (F[:, None] &lt;= F).all(2) &amp; (F[:, None] &lt; F).any(2)
+    dominated_by = dominates.sum(0)
+    rank = np.full(len(F), -1)
+    level = 0
+    while (rank &lt; 0).any():
+        front = (dominated_by == 0) &amp; (rank &lt; 0)
+        rank[front] = level
+        dominated_by -= dominates[front].sum(0)
+        level += 1
+    return rank</pre>
+<ul>
+  <li><code>F[:, None]</code> is (N, 1, 4) against F (N, 4): broadcasting compares every pair. <code>dominates[i, j]</code> is True when i dominates j.</li>
+  <li><code>dominated_by[j]</code> counts who dominates j. Zero means j is on the current front. Removing that front lowers the counts of the points it dominated, exposing the next front.</li>
+</ul>
+
+<h3>SBX in NumPy</h3>
+<pre>u = rng.random(a.shape)
+power = 1 / (ETA_CROSSOVER + 1)
+beta = np.where(u &lt;= 0.5, (2 * u) ** power, (1 / (2 * (1 - u))) ** power)
+child1 = 0.5 * ((1 + beta) * a + (1 - beta) * b)
+child2 = 0.5 * ((1 - beta) * a + (1 + beta) * b)
+keep = (rng.random(len(a))[:, None] &gt; CROSSOVER_RATE) | (rng.random(a.shape) &gt; 0.5)
+return np.where(keep, a, child1), np.where(keep, b, child2)</pre>
+
+<h3>Elitist survival</h3>
+<pre>X = np.vstack([X, children])
+F = np.vstack([F, evaluate(children)])
+rank = pareto_rank(F)
+crowd = crowding_distance(F, rank)
+best = np.lexsort((-crowd, rank))[:pop_size]</pre>
+<p><code>np.lexsort</code> sorts by the <b>last</b> key first: by rank, then by larger crowding distance (hence <code>-crowd</code>). The first 100 survive.</p>
+
+<h3>Testing on unseen traffic (<code>main.py</code>)</h3>
+<pre>plans = np.vstack([fixed_plan(), webster_plan(), pick, no_offsets])
+poisson = np.array([traffic.simulate(plans, seed=s) for s in range(30)])</pre>
+<p>All four plans are simulated together, so each seed gives them identical random arrivals.</p>
+
+<!-- ============================================================ -->
+<h2 id="test">16. Testing</h2>
+<p>Run <code>python test_project.py</code>. Plain <code>assert</code> statements, no test framework. All 12 pass.</p>
+<table>
+<tr><th>#</th><th>Check</th><th>What it proves</th></tr>
+<tr><td>1</td><td>Pareto rank on a hand-worked 4-point example</td><td>Sorting is correct</td></tr>
+<tr><td>2</td><td>Equal points share a front</td><td>No false domination on ties</td></tr>
+<tr><td>3</td><td>Crowding: ends infinite, middle = 2.0</td><td>Crowding formula is correct</td></tr>
+<tr><td>4</td><td>SBX + mutation stay inside bounds</td><td>Operators never create invalid genes</td></tr>
+<tr><td>5</td><td>Schaffer problem: f₁ = x², f₂ = (x − 2)²</td><td>NSGA-II finds the known Pareto set 0 ≤ x ≤ 2</td></tr>
+<tr><td>6</td><td>Routing rows sum to ≤ 1, interior = 1</td><td>The model never creates vehicles</td></tr>
+<tr><td>7</td><td>Feeder gather equals <code>served @ ROUTING</code></td><td>The speed-up is exact</td></tr>
+<tr><td>8</td><td>Cycle 58, split 0.4, offset 0.5 → 20 / 30 / 29 s</td><td>Decoding is correct</td></tr>
+<tr><td>9</td><td>Split 0 → 10 s minimum green</td><td>Safety limit enforced</td></tr>
+<tr><td>10</td><td>Near-zero demand → no congestion</td><td>No phantom queues</td></tr>
+<tr><td>11</td><td>120 % demand waits longer than 80 %</td><td>Model responds sensibly</td></tr>
+<tr><td>12</td><td>Population run = plans run one by one</td><td>Vectorisation does not mix plans</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="report">17. Report structure</h2>
+<table>
+<tr><th>Chapter</th><th>Contents</th></tr>
+<tr><td>1. Introduction</td><td>Background, problem statement, objective, project description</td></tr>
+<tr><td>2. Requirements</td><td>Hardware, software, functional and non-functional requirements</td></tr>
+<tr><td>3. System design</td><td>Flow diagram, road network figure, queue model, chromosome, objective formulas</td></tr>
+<tr><td>4. Implementation</td><td>Modules, NSGA-II operator table, code for sorting and decoding, baselines, hypervolume, verification</td></tr>
+<tr><td>5. Results and discussion</td><td>Setup, convergence, Pareto front, correlations, baseline tables, figures, selected plan, demand sensitivity, discussion</td></tr>
+<tr><td>6. Summary and conclusion</td><td>What was built and what it achieved, with its limits</td></tr>
+<tr><td>References</td><td>9: Deb 2002 (NSGA-II), Deb &amp; Agrawal 1995 (SBX), Zitzler &amp; Thiele 1999 (hypervolume), Deb &amp; Jain 2014 (NSGA-III), Webster 1958, Robertson 1969 (TRANSYT), Akçelik 1981, NumPy, Matplotlib</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="limits">18. Limitations and future work</h2>
+<div class="two">
+<div>
+<h3>Limitations</h3>
+<ul>
+  <li>Point queues: no spillback or gridlock</li>
+  <li>Synthetic network and demand; demand constant over time</li>
+  <li>Fixed turning shares</li>
+  <li>Fuel and NOx rates assumed, not calibrated</li>
+  <li>No pedestrian phases, buses or protected turns; 43 s may be short for wide crossings</li>
+  <li>Fixed-time plan, not adaptive</li>
+  <li>Worse than Webster at 120 % demand</li>
+</ul>
+</div>
+<div>
+<h3>Future work</h3>
+<ul>
+  <li>Optimise across several demand scenarios for robust plans</li>
+  <li>Validate in SUMO (microscopic simulator) with real traffic counts</li>
+  <li>Add spillback, time-varying demand and calibrated emissions</li>
+  <li>Compare with NSGA-III</li>
+  <li>Adaptive control that re-optimises from live detector data</li>
+</ul>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="qa">19. Likely viva questions</h2>
+
+<h3>Basics</h3>
+<p><b>Q1. What is your project about?</b></p>
+<div class="ans">Optimising traffic signal timings for a simulated 9-junction city grid with NSGA-II, so that congestion, waiting time, fuel use and NOx pollution are all reduced together.</div>
+<p><b>Q2. What is a genetic algorithm?</b></p>
+<div class="ans">A search method based on natural selection. It keeps a population of encoded solutions and repeatedly selects good ones, combines them by crossover, changes them by mutation, and keeps the best. It only needs to score solutions, not a gradient.</div>
+<p><b>Q3. Why use a GA instead of a mathematical method?</b></p>
+<div class="ans">Our objectives come from a simulator, with no formula or gradient. The search space is large (19 continuous genes, 9 interacting junctions) and has many local optima. A GA handles black-box objectives and, being population-based, returns many trade-off plans in one run.</div>
+<p><b>Q4. What is a Pareto front?</b></p>
+<div class="ans">The set of plans no other plan dominates. Plan a dominates b if it is no worse in all four objectives and better in at least one. On the front, improving one objective means worsening another.</div>
+<p><b>Q5. Why not combine the four objectives with weights?</b></p>
+<div class="ans">Their units differ, so weights are arbitrary; one run gives only one plan; and a weighted sum misses non-convex parts of the front. NSGA-II gives the whole trade-off in one run.</div>
+
+<h3>NSGA-II</h3>
+<p><b>Q6. Explain NSGA-II.</b></p>
+<div class="ans">Rank the population by non-dominated sorting, compute crowding distance within each front, choose parents by binary tournament (rank, then crowding), create children by crossover and mutation, merge parents and children, and keep the best N by rank then crowding. Repeat for a set number of generations.</div>
+<p><b>Q7. What is crowding distance?</b></p>
+<div class="ans">For each objective, sort the front; end points get infinity; inner points get the gap between their neighbours divided by the objective's range; sum over objectives. It favours isolated points so the front stays spread out.</div>
+<p><b>Q8. How is elitism achieved?</b></p>
+<div class="ans">Parents and children (200) are ranked together and only the best 100 survive, so a good plan is only replaced by something at least as good.</div>
+<p><b>Q9. What is hypervolume and how did you compute it?</b></p>
+<div class="ans">The volume of objective space dominated by a front up to a reference point; it measures convergence and spread together. With 4 objectives we estimated it by Monte Carlo: 100,000 random points in the normalised box [0, 1.1]⁴, counting the share dominated by the front.</div>
+<p><b>Q10. Why compare against random search?</b></p>
+<div class="ans">To prove the evolutionary operators matter. With the same 30,100 evaluations, random search reached hypervolume 0.032 against 0.907 for NSGA-II.</div>
+<p><b>Q11. What are SBX and polynomial mutation?</b></p>
+<div class="ans">SBX is a real-valued crossover that places children near the parents, with spread controlled by η = 15. Polynomial mutation adds a small random step to a gene, usually small, sometimes large, controlled by η = 20, then clips it to the bounds.</div>
+<p><b>Q12. What parameters did you use?</b></p>
+<div class="ans">Population 100, 300 generations, crossover probability 0.9 per pair and 0.5 per gene, SBX η = 15, mutation probability 1/19 per gene, mutation η = 20.</div>
+<p><b>Q13. What would you use with more objectives?</b></p>
+<div class="ans">NSGA-III. With many objectives nearly every point becomes non-dominated and crowding distance stops discriminating; NSGA-III uses reference directions instead.</div>
+
+<h3>Traffic model and design</h3>
+<p><b>Q14. What is in your chromosome?</b></p>
+<div class="ans">19 real numbers: one shared cycle length (40–120 s), then for each of the 9 junctions a green split (0–1) and an offset (0–1, as a fraction of the cycle).</div>
+<p><b>Q15. What is an offset and why does it matter?</b></p>
+<div class="ans">The shift of a junction's cycle start relative to the others. Good offsets let a platoon released at one junction arrive on green at the next: a green wave. Setting our offsets to zero raised waiting from 44.3 to 55.7 s/veh.</div>
+<p><b>Q16. Why one shared cycle for all junctions?</b></p>
+<div class="ans">With different cycles, the relative timing between neighbours drifts every cycle, so offsets mean nothing. Our first per-junction version could not beat Webster. A common cycle is also standard practice for coordinated signals.</div>
+<p><b>Q17. How do you handle constraints such as minimum green?</b></p>
+<div class="ans">In decoding. Greens are clipped to at least 10 s, and the cycle is bounded to 40–120 s, so every chromosome becomes a legal plan. No penalty function is needed.</div>
+<p><b>Q18. How does your simulator work?</b></p>
+<div class="ans">Every second, vehicles join a queue at each approach. On green the queue discharges at up to 0.5 veh/s. Discharged vehicles split by turning shares, travel to the next junction after a delay, and spread out by Robertson's platoon dispersion. Waiting, stops and distance are summed into the objectives.</div>
+<p><b>Q19. What is platoon dispersion?</b></p>
+<div class="ans">A group released on green spreads out as it travels, because drivers choose different speeds. Robertson's model from TRANSYT smooths the arrivals with factor F = 1 / (1 + αβT), using α = 0.35 and β = 0.8.</div>
+<p><b>Q20. How do you count a stop?</b></p>
+<div class="ans">An arriving vehicle counts as a stop if its signal is red or there is already a queue.</div>
+<p><b>Q21. Why NOx and not CO₂ for pollution?</b></p>
+<div class="ans">CO₂ is 2.31 kg per litre of petrol, so it is fuel multiplied by a constant and would duplicate the fuel objective. NOx depends mostly on stops, so it measures something different. CO₂ is still reported.</div>
+<p><b>Q22. Why is congestion measured as peak queue?</b></p>
+<div class="ans">Average queue is proportional to waiting time (Little's law), so it would duplicate waiting. Peak queue shows how close each link gets to overflowing.</div>
+<p><b>Q23. Are your fuel and emission numbers real?</b></p>
+<div class="ans">They are order-of-magnitude assumptions, not calibrated values. So we rely on percentage differences between plans rather than absolute numbers, and calibration is future work.</div>
+
+<h3>Results and evaluation</h3>
+<p><b>Q24. What is Webster's method?</b></p>
+<div class="ans">A 1958 formula for one junction: cycle C₀ = (1.5L + 5)/(1 − Y), with greens split in proportion to flow ratios. Our critical junction J4 has Y = 0.775, giving 75.7 s. It ignores neighbouring junctions, so offsets are zero.</div>
+<p><b>Q25. What were your main results?</b></p>
+<div class="ans">On 30 random-traffic seeds, against Webster: waiting −30.8 % (64.0 → 44.3 s/veh), congestion −35.6 %, fuel −4.5 %, NOx −2.1 %. Against fixed-time, waiting fell by 41.7 %.</div>
+<p><b>Q26. How did you pick one plan from the front?</b></p>
+<div class="ans">Normalise each objective on the front to 0–1 and take the plan closest to the ideal point (all zeros). It is a balanced compromise without weights.</div>
+<p><b>Q27. How do you know the plan isn't overfitted?</b></p>
+<div class="ans">The search used smooth demand, but we tested on 30 Poisson random-traffic seeds it never saw, with identical arrivals for every plan. The gain over Webster shrank from 54.3 % to 30.8 % but stayed large. We report the Poisson figure.</div>
+<p><b>Q28. Why only 2–4 % improvement in fuel and NOx?</b></p>
+<div class="ans">Every plan drives the same distance, which is a large fixed part of fuel and NOx. Only the idling and stopping parts can be reduced.</div>
+<p><b>Q29. Do the four objectives really conflict?</b></p>
+<div class="ans">Partly. On the front, congestion and waiting correlate +0.98, fuel and NOx +0.99, but waiting and fuel −0.84. So there are effectively two competing goals: keeping vehicles moving vs avoiding stop-start driving.</div>
+<p><b>Q30. What is the weakness of your plan?</b></p>
+<div class="ans">At 120 % demand it waits 119.9 s/veh vs Webster's 87.8. Its 43 s cycle gives only 81 % usable green (vs 89 % for 76 s), and J4 then needs 93 %. A plan tuned for one demand level must be re-optimised or optimised over several scenarios.</div>
+<p><b>Q31. Why did you run 11 times?</b></p>
+<div class="ans">A GA is random, so one run proves little. 11 runs give a true median: we report the median run, not the best, plus mean and sd of hypervolume.</div>
+<p><b>Q32. Why did every run choose such a short cycle?</b></p>
+<div class="ans">At normal demand there is spare capacity, and a short cycle means shorter red times, so less waiting. The cost is less capacity under overload, as Q30 shows.</div>
+
+<h3>Implementation</h3>
+<p><b>Q33. How did you make it fast enough?</b></p>
+<div class="ans">Vectorisation: the simulator works on (plans × links) arrays, so all 100 plans of a generation are simulated together. The 22 independent searches run in parallel on 8 processes with <code>multiprocessing.Pool</code>. The full experiment takes about 17 minutes.</div>
+<p><b>Q34. How did you test the code?</b></p>
+<div class="ans">12 assert checks: hand-worked Pareto ranks and crowding, Schaffer's test problem, operators staying in bounds, routing never creating vehicles, decoding and minimum green, sensible responses to demand, and population results matching single-plan results.</div>
+<p><b>Q35. Are the results reproducible?</b></p>
+<div class="ans">Yes. Every random generator uses a fixed seed: demand (42), each GA run, random search and every Poisson seed. Running <code>python main.py</code> regenerates the same tables and figures.</div>
+<p><b>Q36. Could this work on a real city?</b></p>
+<div class="ans">Not directly. It would need real road geometry and traffic counts, calibrated emissions, pedestrian phases, and validation in a microscopic simulator such as SUMO. The method itself transfers: only the simulator inside the fitness function changes.</div>
+
+<!-- ============================================================ -->
+<h2 id="nums">20. Numbers to remember</h2>
+<div class="two">
+<table class="mono">
+<tr><th>Setup</th><th class="c">Value</th></tr>
+<tr><td>Junctions / links</td><td class="c">9 / 36</td></tr>
+<tr><td>Genes</td><td class="c">19</td></tr>
+<tr><td>Population × generations</td><td class="c">100 × 300</td></tr>
+<tr><td>Evaluations per run</td><td class="c">30,100</td></tr>
+<tr><td>Runs (each method)</td><td class="c">11</td></tr>
+<tr><td>Cycle range / min green</td><td class="c">40–120 s / 10 s</td></tr>
+<tr><td>Lost time</td><td class="c">4 s × 2</td></tr>
+<tr><td>Saturation flow</td><td class="c">0.5 veh/s</td></tr>
+<tr><td>Demand + clearance</td><td class="c">1800 + 300 s</td></tr>
+<tr><td>SBX η / mutation η</td><td class="c">15 / 20</td></tr>
+<tr><td>Poisson seeds</td><td class="c">30</td></tr>
+<tr><td>Checks</td><td class="c">12</td></tr>
+</table>
+<table class="mono">
+<tr><th>Results</th><th class="c">Value</th></tr>
+<tr><td>Hypervolume GA / random</td><td class="c">0.907 / 0.032</td></tr>
+<tr><td>Selected cycle</td><td class="c">43 s</td></tr>
+<tr><td>Webster cycle (J4, Y=0.775)</td><td class="c">75.7 s</td></tr>
+<tr><td>Waiting: Webster → GA</td><td class="c">64.0 → 44.3 s/veh</td></tr>
+<tr><td>Waiting vs Webster</td><td class="c">−30.8 %</td></tr>
+<tr><td>Congestion vs Webster</td><td class="c">−35.6 %</td></tr>
+<tr><td>Fuel / NOx vs Webster</td><td class="c">−4.5 % / −2.1 %</td></tr>
+<tr><td>Waiting vs fixed-time</td><td class="c">−41.7 %</td></tr>
+<tr><td>No offsets</td><td class="c">55.7 s/veh</td></tr>
+<tr><td>Smooth vs random gain</td><td class="c">54.3 % vs 30.8 %</td></tr>
+<tr><td>120 % demand GA / Webster</td><td class="c">119.9 / 87.8</td></tr>
+<tr><td>Runtime</td><td class="c">≈ 17 min</td></tr>
+</table>
+</div>
+
+<footer>Prints cleanly on A4 (Ctrl+P). Night before: read sections 1, 6, 7, 10, 14 and 19.</footer>
+</main>
+</body>
+</html>
